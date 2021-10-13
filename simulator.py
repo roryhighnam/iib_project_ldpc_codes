@@ -55,6 +55,7 @@ class regular_LDPC_code():
         if remaining_parity_checks.shape[0] < binary_sequence.count(0):
             # Should we return corrected bits if we can solve for some bits?
             return [-1]
+        # Deal with no erasures case
         if len(known_codeword) == self.n:
             return list(map(lambda x: 0 if x==-1 else x, binary_sequence))
         
@@ -176,13 +177,13 @@ class regular_LDPC_code():
 # test_sequence = [1,1,0,1,0]
 # print(np.linalg.matrix_rank(GF2(parity_check)))
 
-parity_check = generate_random_parity_check(20,10,3,6)
+parity_check = generate_random_parity_check(20,3,6)
 
 LDPC = regular_LDPC_code(parity_check)
 
 test_sequence = np.random.randint(2, size=LDPC.k)
 
-BEC = BEC(0.3)
+BEC = BEC(0.1)
 print('Generated codeword:', LDPC.encode(test_sequence))
 
 channel_output = BEC.transmit(LDPC.encode(test_sequence))
@@ -195,16 +196,26 @@ print('Optimally decoded codeword:', decoded_codeword)
 
 print('Message passing codeword:', LDPC.message_pass_decode(channel_output, 50))
 
-for i in range(50):
+message_passing_errors = 0
+optimal_decoding_errors = 0
+num_tests = 5000
+
+for i in range(num_tests):
+    print(i)
+    parity_check = generate_random_parity_check(100,3,6)
+
+    LDPC = regular_LDPC_code(parity_check)
+    test_sequence = np.random.randint(2, size=LDPC.k)
+
     # print('Generated Codeword:', LDPC.encode(test_sequence))
     channel_output = BEC.transmit(LDPC.encode(test_sequence))
     # print('Channel output:', channel_output)
     decoded_codeword = LDPC.message_pass_decode(channel_output, 50)
     # print('Decoded Codeword:', decoded_codeword)
     if '?' in decoded_codeword:
-        print('Still contains errors!')
-        if -1 in LDPC.optimal_decode(channel_output):
-            print('Optimal decoder successful')
-        else:
-            print('Optimal decoder also cannot solve')
-        print()
+        message_passing_errors += 1
+        if -1 not in LDPC.optimal_decode(channel_output):
+            optimal_decoding_errors += 1
+
+print('Message passing block-wise error percentage', 100*message_passing_errors/num_tests)
+print('Optimal decoding block-wise error percentage', 100*optimal_decoding_errors/num_tests)

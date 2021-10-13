@@ -1,7 +1,10 @@
 import random
 import numpy as np
 
-def generate_random_parity_check(n,k,dv,dc):
+def generate_random_parity_check(n,dv,dc):
+
+    k = int(n*(1-dv/dc))
+
 
     # Generate a list containing each check node dc times which will be used to draw from
     check_nodes_available = []
@@ -21,7 +24,7 @@ def generate_random_parity_check(n,k,dv,dc):
                 check_nodes_available.remove(choice)
                 check_nodes_available_to_variable = [x for x in check_nodes_available_to_variable if x != choice]
     except:
-        return generate_random_parity_check(n,k,dv,dc)
+        return generate_random_parity_check(n,dv,dc)
     
 
     # Check that all variable nodes have all dv check nodes connected 
@@ -29,7 +32,7 @@ def generate_random_parity_check(n,k,dv,dc):
     # may be no check nodes available without repeating one it already has
     for check_node_combinations in variable_nodes.values():
         if len(check_node_combinations) != dv:
-            return generate_random_parity_check(n,k,dv,dc)
+            return generate_random_parity_check(n,dv,dc)
         check_node_combinations.sort()
 
     # Check that no two lists of check nodes are identical for any variable node 
@@ -40,7 +43,7 @@ def generate_random_parity_check(n,k,dv,dc):
             if other_check_node_combinations == check_node_combination:
                 count += 1
         if count > 1:
-            return generate_random_parity_check(n,k,dv,dc)
+            return generate_random_parity_check(n,dv,dc)
 
     # Convert dictionary of variable nodes to parity check matrix
     parity_check_matrixT = np.zeros((n, n-k))
@@ -50,3 +53,5 @@ def generate_random_parity_check(n,k,dv,dc):
 
 # for i in range(10):
 #     print(generate_random_parity_check(10,5,3,6))
+
+print(generate_random_parity_check(500,3,6))
