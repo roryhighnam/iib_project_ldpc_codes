@@ -4,6 +4,7 @@ from pyldpc.code import coding_matrix_systematic, coding_matrix
 from pyldpc.utils import gausselimination
 from channels import BEC
 from random_code_generator import generate_random_parity_check
+import matplotlib.pyplot as plt
 
 class regular_LDPC_code():
 
@@ -130,6 +131,8 @@ class regular_LDPC_code():
             for check in check_node_list:
                 Mvc[check][variable_node] = binary_sequence[variable_node]
 
+        errors = []
+
         # Iterate for a fixed number of iterations, specified by max_its
         # May want to change this to stop iterating when messages do not update?
         for it in range(max_its):
@@ -150,12 +153,14 @@ class regular_LDPC_code():
                         other_check_nodes = check_node_list.copy()
                         other_check_nodes.remove(check_node)
                         Mvc[check_node][variable_node] = self.compute_vc_message(Mcv.T[variable_node][other_check_nodes])
+            decoded_values = np.array(np.sum(Mvc, axis=0)/self.dv, dtype='int0')
+            errors.append(self.n - np.count_nonzero(decoded_values))
         # Convert messages to a list of decoded values. On the BEC there are no conflicts so we can simply sum each column
         # and divide by variable degree as it is a regular code.
         decoded_values = np.array(np.sum(Mvc, axis=0)/self.dv, dtype='int0')
         # Convert decoded values back to binary list, leaving '?' if erasures still present
         decoded_values = list(map(lambda x:'?' if x==0 else x, decoded_values))
-        return list(map(lambda x: 0 if x==-1 else x, decoded_values))
+        return list(map(lambda x: 0 if x==-1 else x, decoded_values)), errors
 
 # Example taken from lecture notes (n=20, k=10, dv=3, dc=6)
 # parity_check = np.array([[0,0,1,0,0,0,1,0,1,0,0,0,0,1,0,1,0,0,1,0],[0,1,0,0,1,0,1,0,0,1,0,0,1,0,0,0,0,1,0,0],[1,0,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,1,1,0],
@@ -181,12 +186,11 @@ parity_check = generate_random_parity_check(20,3,6)
 
 LDPC = regular_LDPC_code(parity_check)
 
-test_sequence = np.random.randint(2, size=LDPC.k)
+codeword = np.zeros(LDPC.n)
 
-BEC = BEC(0.1)
-print('Generated codeword:', LDPC.encode(test_sequence))
+BEC = BEC(0.4)
 
-channel_output = BEC.transmit(LDPC.encode(test_sequence))
+channel_output = BEC.transmit(codeword)
 print('Channel output:', channel_output)
 
 print('Number of erasures:', channel_output.count(0))
@@ -200,22 +204,36 @@ message_passing_errors = 0
 optimal_decoding_errors = 0
 num_tests = 5000
 
+average_errors = []
+
 for i in range(num_tests):
     print(i)
-    parity_check = generate_random_parity_check(100,3,6)
+    parity_check = generate_random_parity_check(100,6,12)
 
     LDPC = regular_LDPC_code(parity_check)
-    test_sequence = np.random.randint(2, size=LDPC.k)
+    codeword = np.zeros(LDPC.n)
 
     # print('Generated Codeword:', LDPC.encode(test_sequence))
-    channel_output = BEC.transmit(LDPC.encode(test_sequence))
+    channel_output = BEC.transmit(codeword)
     # print('Channel output:', channel_output)
-    decoded_codeword = LDPC.message_pass_decode(channel_output, 50)
+    decoded_codeword, errors = LDPC.message_pass_decode(channel_output, 20)
+    if len(average_errors) == 0:
+        average_errors += errors
+        average_errors = np.array(average_errors)
+    else:
+        average_errors = average_errors*i + errors
+        average_errors = average_errors / (i+1)
     # print('Decoded Codeword:', decoded_codeword)
     if '?' in decoded_codeword:
         message_passing_errors += 1
         if -1 not in LDPC.optimal_decode(channel_output):
             optimal_decoding_errors += 1
+
+average_errors = average_errors / LDPC.n
+plt.plot(average_errors)
+plt.xlabel('Number of iterations')
+plt.ylabel('Average bit error rate')
+plt.show()
 
 print('Message passing block-wise error percentage', 100*message_passing_errors/num_tests)
 print('Optimal decoding block-wise error percentage', 100*optimal_decoding_errors/num_tests)
