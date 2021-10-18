@@ -1,10 +1,12 @@
+from random import gauss
 import numpy as np
 import galois
 from pyldpc.code import coding_matrix_systematic, coding_matrix
-from pyldpc.utils import gausselimination
+from pyldpc.utils import gausselimination, gaussjordan
 from channels import BEC
 from random_code_generator import generate_random_parity_check
 import matplotlib.pyplot as plt
+import csv
 
 class regular_LDPC_code():
 
@@ -60,11 +62,28 @@ class regular_LDPC_code():
         if len(known_codeword) == self.n:
             return list(map(lambda x: 0 if x==-1 else x, binary_sequence))
         
-        # Perform gaussian elimination to recover decoded codeword (This could still fail if we cannot use back substitution)
+        # Perform gaussian elimination to recover decoded codeword
+        # Check all diagonals have a 1, otherwise remove this column -> this bit cannot be determined
+
         upper_triangular_matrix, target = gausselimination(remaining_parity_checks, target)
+
+        columns_to_delete = []
+        for i in range(upper_triangular_matrix.shape[1]):
+            if upper_triangular_matrix[i][i] != 1:
+                columns_to_delete.append(i)
+        upper_triangular_matrix = np.delete(upper_triangular_matrix, columns_to_delete, axis=1)
+        upper_triangular_matrix = np.delete(upper_triangular_matrix, columns_to_delete, axis=0)
+        target = np.delete(target, columns_to_delete)
+
         try:
-            solved_unknowns = np.linalg.solve(upper_triangular_matrix[:binary_sequence.count(0),:], target[:binary_sequence.count(0)])
+            solved_unknowns = np.mod(np.linalg.solve(upper_triangular_matrix[:upper_triangular_matrix.shape[1],:], target[:upper_triangular_matrix.shape[1]]),2)
+            for index in columns_to_delete:
+                # If 0 on diagonal, insert 2 into solved_unknowns to represent erausre (cannot be string i.e. '?')
+                solved_unknowns = np.insert(solved_unknowns, index, 2)
         except:
+            # If not enough equations, use gauss jordan elimination to get reduced row echelon form.
+            # Now, we can remove columns of resulting matrix which are not only 1 on the diagonal
+            print("Didn't run")
             return [-1]
 
         # Finally, loop through input sequence and convert -1s back to 0s and add in our solved unknowns (previously erasures)
@@ -76,10 +95,12 @@ class regular_LDPC_code():
                 else:
                     decoded_codeword += [1]
             else:
-                decoded_codeword += [solved_unknowns[0]]
+                if solved_unknowns[0] == 2:
+                    decoded_codeword += '?'
+                else:
+                    decoded_codeword += [solved_unknowns[0]]
                 solved_unknowns = np.delete(solved_unknowns, 0)
-
-        return np.mod(np.array(decoded_codeword, dtype='int0'),2)
+        return decoded_codeword
 
     def compute_cv_message(self, inputs):
         '''Function to compute the check->variable message. Pass in all variable->check 
@@ -132,27 +153,29 @@ class regular_LDPC_code():
                 Mvc[check][variable_node] = binary_sequence[variable_node]
 
         errors = []
+        decoded_values = [0]
 
         # Iterate for a fixed number of iterations, specified by max_its
         # May want to change this to stop iterating when messages do not update?
         for it in range(max_its):
-            # Update Mcv first:
-            for check_node, variable_node_list in check_lookup.items():
-                for variable_node in variable_node_list:
-                    # Remove current variable node from inputs to compute_cv_message function
-                    other_variable_nodes = variable_node_list.copy()
-                    other_variable_nodes.remove(variable_node)
-                    Mcv[check_node][variable_node] = self.compute_cv_message(Mvc[check_node][other_variable_nodes])
+            if np.count_nonzero(decoded_values == 0) > 0:
+                # Update Mcv first:
+                for check_node, variable_node_list in check_lookup.items():
+                    for variable_node in variable_node_list:
+                        # Remove current variable node from inputs to compute_cv_message function
+                        other_variable_nodes = variable_node_list.copy()
+                        other_variable_nodes.remove(variable_node)
+                        Mcv[check_node][variable_node] = self.compute_cv_message(Mvc[check_node][other_variable_nodes])
 
-            # Then update Mvc
-            for variable_node, check_node_list in variable_lookup.items():
-                for check_node in check_node_list:
-                    # If current Mvc message is already non-erasure, do nothing
-                    if Mvc[check_node][variable_node] == 0:
-                        # Otherwise, run compute_vc_message with check_nodes other than the current one
-                        other_check_nodes = check_node_list.copy()
-                        other_check_nodes.remove(check_node)
-                        Mvc[check_node][variable_node] = self.compute_vc_message(Mcv.T[variable_node][other_check_nodes])
+                # Then update Mvc
+                for variable_node, check_node_list in variable_lookup.items():
+                    for check_node in check_node_list:
+                        # If current Mvc message is already non-erasure, do nothing
+                        if Mvc[check_node][variable_node] == 0:
+                            # Otherwise, run compute_vc_message with check_nodes other than the current one
+                            other_check_nodes = check_node_list.copy()
+                            other_check_nodes.remove(check_node)
+                            Mvc[check_node][variable_node] = self.compute_vc_message(Mcv.T[variable_node][other_check_nodes])
             decoded_values = np.array(np.sum(Mvc, axis=0)/self.dv, dtype='int0')
             errors.append(self.n - np.count_nonzero(decoded_values))
         # Convert messages to a list of decoded values. On the BEC there are no conflicts so we can simply sum each column
@@ -173,15 +196,6 @@ class regular_LDPC_code():
 # GF2 = galois.GF(2)
 # print(np.linalg.matrix_rank(GF2(parity_check)))
 
-# Example of bad parity check matrix - not full rank (rank of 3)
-# parity_check = np.array([[0,1,0,1,1,0,0,1],[1,1,1,0,0,1,0,0],[0,0,1,0,0,1,1,1],[1,0,0,1,1,0,1,0]])
-# test_sequence = [1,0,0,1]
-# print(np.linalg.matrix_rank(GF2(parity_check)))
-
-# parity_check = np.array([[1,0,1,1,1,0,1,1,0,0],[0,1,1,0,0,1,1,0,1,1],[1,1,0,1,1,1,0,1,0,0],[0,1,1,0,1,0,1,0,1,1],[1,0,0,1,0,1,0,1,1,1]])
-# test_sequence = [1,1,0,1,0]
-# print(np.linalg.matrix_rank(GF2(parity_check)))
-
 parity_check = generate_random_parity_check(20,3,6)
 
 LDPC = regular_LDPC_code(parity_check)
@@ -200,40 +214,75 @@ print('Optimally decoded codeword:', decoded_codeword)
 
 print('Message passing codeword:', LDPC.message_pass_decode(channel_output, 50))
 
-message_passing_errors = 0
-optimal_decoding_errors = 0
-num_tests = 5000
+message_passing_block_errors = 0
+message_passing_bit_errors= 0
+optimal_decoding_block_errors = 0
+optimal_decoding_bit_errors = 0
+
+num_tests = 10000
+iterations = 50
+n = 200
+dv = 3
+dc = 6
 
 average_errors = []
 
 for i in range(num_tests):
     print(i)
-    parity_check = generate_random_parity_check(100,6,12)
+    parity_check = generate_random_parity_check(n,dv,dc)
 
     LDPC = regular_LDPC_code(parity_check)
     codeword = np.zeros(LDPC.n)
 
     # print('Generated Codeword:', LDPC.encode(test_sequence))
     channel_output = BEC.transmit(codeword)
-    # print('Channel output:', channel_output)
-    decoded_codeword, errors = LDPC.message_pass_decode(channel_output, 20)
+
+    decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations+1)
     if len(average_errors) == 0:
         average_errors += errors
         average_errors = np.array(average_errors)
     else:
         average_errors = average_errors*i + errors
         average_errors = average_errors / (i+1)
-    # print('Decoded Codeword:', decoded_codeword)
+
     if '?' in decoded_codeword:
-        message_passing_errors += 1
-        if -1 not in LDPC.optimal_decode(channel_output):
-            optimal_decoding_errors += 1
+        message_passing_block_errors += 1
+    optimal_decoded_codeword = LDPC.optimal_decode(channel_output)
+    if '?' in optimal_decoded_codeword:
+        optimal_decoding_block_errors += 1
+
+    optimal_decoding_bit_errors += optimal_decoded_codeword.count('?')
+    message_passing_bit_errors += decoded_codeword.count('?')
 
 average_errors = average_errors / LDPC.n
+
+filename = 'regular_code'
+filename += '_BEC=' + str(BEC.erasure_prob)
+filename += '_n=' + str(LDPC.n)
+filename += '_k=' + str(LDPC.k)
+filename += '_dv=' + str(LDPC.dv)
+filename += '_dc=' + str(LDPC.dc)
+filename += '_it=' + str(iterations)
+filename += '_num=' + str(num_tests)
+filename += '.csv'
+
+with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    for error_at_iteration in average_errors:
+        writer.writerow([error_at_iteration])
+    writer.writerow(['Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests])
+    writer.writerow(['Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n)])
+    writer.writerow(['Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests])
+    writer.writerow(['Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)])
+
 plt.plot(average_errors)
+plt.yscale('log')
 plt.xlabel('Number of iterations')
 plt.ylabel('Average bit error rate')
 plt.show()
 
-print('Message passing block-wise error percentage', 100*message_passing_errors/num_tests)
-print('Optimal decoding block-wise error percentage', 100*optimal_decoding_errors/num_tests)
+print('Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests)
+print('Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests)
+
+print('Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n))
+print('Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n))
