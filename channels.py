@@ -14,8 +14,3 @@ class BEC:
             else:
                 output_binary += [-1] if bit == 0 else [1]
         return output_binary
-
-
-# my_BEC = BEC(0.5)
-# input_sequence = [0,0,1,0,0,1,1,1,0,0,1,0,1,0,0]
-# output_sequence = my_BEC.transmit(input_sequence)

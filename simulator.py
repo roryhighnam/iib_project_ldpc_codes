@@ -155,8 +155,7 @@ class regular_LDPC_code():
         errors = []
         decoded_values = [0]
 
-        # Iterate for a fixed number of iterations, specified by max_its
-        # May want to change this to stop iterating when messages do not update?
+        # Iterate for a fixed number of iterations, specified by max_its, skip message updates if no erasures in messages
         for it in range(max_its):
             if np.count_nonzero(decoded_values == 0) > 0:
                 # Update Mcv first:
@@ -202,7 +201,7 @@ LDPC = regular_LDPC_code(parity_check)
 
 codeword = np.zeros(LDPC.n)
 
-BEC = BEC(0.4)
+BEC = BEC(0.2)
 
 channel_output = BEC.transmit(codeword)
 print('Channel output:', channel_output)
@@ -248,7 +247,7 @@ for i in range(num_tests):
     if '?' in decoded_codeword:
         message_passing_block_errors += 1
     optimal_decoded_codeword = LDPC.optimal_decode(channel_output)
-    if '?' in optimal_decoded_codeword:
+    if '?' in optimal_decoded_codeword or -1 in optimal_decoded_codeword:
         optimal_decoding_block_errors += 1
 
     optimal_decoding_bit_errors += optimal_decoded_codeword.count('?')
