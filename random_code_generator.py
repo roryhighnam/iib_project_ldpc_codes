@@ -3,6 +3,9 @@ import numpy as np
 
 def generate_random_parity_check(n,dv,dc):
 
+    if n*dv % dc != 0:
+        return [0]
+
     k = int(n*(1-dv/dc))
 
 
@@ -54,4 +57,5 @@ def generate_random_parity_check(n,dv,dc):
 # for i in range(10):
 #     print(generate_random_parity_check(10,5,3,6))
 
-print(generate_random_parity_check(500,3,6))
+# print(generate_random_parity_check(500,3,6))
+# print(generate_random_parity_check(11, 3,6))
