@@ -388,8 +388,8 @@ parameters = []
 #     dictionary = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
 #     parameters.append(dictionary)
 
-for i in range(8,32):
-    dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':100, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
+for i in range(32):
+    dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':50, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
     parameters.append(dictionary)
 
 if __name__ == '__main__':
