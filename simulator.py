@@ -23,6 +23,7 @@ def write_file(filename, errors, message_passing_block_error, message_passing_bi
         if optimal_bit_error:
             writer.writerow(['Optimal decoding bit-wise error percentage', optimal_bit_error])
 
+
 class regular_LDPC_code():
 
     def __init__(self,parity_check):
@@ -292,23 +293,11 @@ def run_simulation(parameter_set):
     filename += '_num=' + str(num_tests)
     filename += '.csv'
 
-    with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        for error_at_iteration in average_errors:
-            writer.writerow([error_at_iteration])
-        writer.writerow(['Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests])
-        writer.writerow(['Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n)])
-        if optimal:
-            writer.writerow(['Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests])
-            writer.writerow(['Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)])
-
-    print('Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests)
     if optimal:
-        print('Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests)
+        write_file(filename, average_errors, message_passing_block_errors/num_tests, message_passing_bit_errors/(num_tests*LDPC.n), optimal_decoding_block_errors/num_tests, optimal_decoding_bit_errors/(num_tests*LDPC.n))
+    else:
+        write_file(filename, average_errors, message_passing_block_errors/num_tests, message_passing_bit_errors/(num_tests*LDPC.n))
 
-    print('Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n))
-    if optimal:
-        print('Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)) 
     print(multiprocessing.current_process().name, ' done')
 
 def run_simulation_fixed_ldpc(parameter_set):
@@ -400,5 +389,5 @@ def run_simulation_fixed_ldpc(parameter_set):
 #     pool.join()
 
 # # run_simulation_fixed_ldpc({'BEC': 0.42, 'num_tests':1000, 'iterations':50, 'n':100, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i})
-parameters = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':1000, 'dv':3, 'dc':6, 'optimal':False}
+parameters = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':200, 'dv':3, 'dc':6, 'optimal':False}
 run_simulation(parameters)
