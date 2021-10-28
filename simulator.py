@@ -11,6 +11,18 @@ import multiprocessing
 import cProfile
 import re
 
+def write_file(filename, errors, message_passing_block_error, message_passing_bit_error, optimal_block_error=None, optimal_bit_error=None):
+    with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        for error_at_iteration in errors:
+            writer.writerow([error_at_iteration])
+        writer.writerow(['Message passing block-wise error', message_passing_block_error])
+        writer.writerow(['Message passing bit-wise error', message_passing_bit_error])
+        if optimal_block_error:
+            writer.writerow(['Optimal decoding block-wise error percentage', optimal_block_error])
+        if optimal_bit_error:
+            writer.writerow(['Optimal decoding bit-wise error percentage', optimal_bit_error])
+
 class regular_LDPC_code():
 
     def __init__(self,parity_check):
@@ -187,8 +199,9 @@ class regular_LDPC_code():
         for variable_node,check_node_list in variable_lookup.items():
             for check in check_node_list:
                 Mvc[variable_node] = binary_sequence[variable_node]
-        # print(Mvc)
-        errors = []
+
+        # Intialise error vector with number of errors before starting message passing
+        errors = [self.n - np.count_nonzero(Mvc)]
 
         # Iterate for a fixed number of iterations, specified by max_its, skip message updates if no erasures in messages
         for it in range(max_its):
@@ -232,17 +245,14 @@ def run_simulation(parameter_set):
         optimal_decoding_block_errors = 0
         optimal_decoding_bit_errors = 0
 
-    average_errors = []
-    skip = False
+    # average_errors = []
+    error_counts = np.zeros(iterations+1)
+    i = 0
+    while i<num_tests and message_passing_block_errors<200:
 
-    for i in range(num_tests):
         parity_check = generate_random_parity_check(n,dv,dc)
-
         if len(parity_check) == 1:
-            skip = True
-            break
-        else:
-            skip = False
+            continue
 
         LDPC = regular_LDPC_code(parity_check)
         codeword = np.zeros(LDPC.n)
@@ -250,13 +260,9 @@ def run_simulation(parameter_set):
         # print('Generated Codeword:', LDPC.encode(test_sequence))
         channel_output = sim_BEC.transmit(codeword)
 
-        decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations+1)
-        if len(average_errors) == 0:
-            average_errors += errors
-            average_errors = np.array(average_errors)
-        else:
-            average_errors = average_errors*i + errors
-            average_errors = average_errors / (i+1)
+        decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations)
+
+        error_counts += errors
 
         if '?' in decoded_codeword:
             message_passing_block_errors += 1
@@ -267,37 +273,43 @@ def run_simulation(parameter_set):
 
             optimal_decoding_bit_errors += optimal_decoded_codeword.count('?')
         message_passing_bit_errors += decoded_codeword.count('?')
-    if not skip:
-        average_errors = average_errors / LDPC.n
 
-        filename = 'regular_code'
-        filename += '_BEC=' + str(sim_BEC.erasure_prob)
-        filename += '_n=' + str(LDPC.n)
-        filename += '_k=' + str(LDPC.k)
-        filename += '_dv=' + str(LDPC.dv)
-        filename += '_dc=' + str(LDPC.dc)
-        filename += '_it=' + str(iterations)
-        filename += '_num=' + str(num_tests)
-        filename += '.csv'
+        i += 1
 
-        with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            for error_at_iteration in average_errors:
-                writer.writerow([error_at_iteration])
-            writer.writerow(['Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests])
-            writer.writerow(['Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n)])
-            if optimal:
-                writer.writerow(['Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests])
-                writer.writerow(['Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)])
+    num_tests = i
 
-        print('Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests)
+    # average_errors = average_errors / LDPC.n
+
+    average_errors = error_counts / (LDPC.n*num_tests)
+
+    filename = 'regular_code'
+    filename += '_BEC=' + str(sim_BEC.erasure_prob)
+    filename += '_n=' + str(LDPC.n)
+    filename += '_k=' + str(LDPC.k)
+    filename += '_dv=' + str(LDPC.dv)
+    filename += '_dc=' + str(LDPC.dc)
+    filename += '_it=' + str(iterations)
+    filename += '_num=' + str(num_tests)
+    filename += '.csv'
+
+    with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        for error_at_iteration in average_errors:
+            writer.writerow([error_at_iteration])
+        writer.writerow(['Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests])
+        writer.writerow(['Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n)])
         if optimal:
-            print('Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests)
+            writer.writerow(['Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests])
+            writer.writerow(['Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)])
 
-        print('Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n))
-        if optimal:
-            print('Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)) 
-        print(multiprocessing.current_process().name, ' done')
+    print('Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests)
+    if optimal:
+        print('Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests)
+
+    print('Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n))
+    if optimal:
+        print('Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)) 
+    print(multiprocessing.current_process().name, ' done')
 
 def run_simulation_fixed_ldpc(parameter_set):
     sim_BEC = BEC(parameter_set['BEC'])
@@ -360,43 +372,33 @@ def run_simulation_fixed_ldpc(parameter_set):
     filename += '_num=' + str(num_tests)
     filename += '.csv'
 
-    with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        for error_at_iteration in average_errors:
-            writer.writerow([error_at_iteration])
-        writer.writerow(['Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests])
-        writer.writerow(['Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n)])
-        if optimal:
-            writer.writerow(['Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests])
-            writer.writerow(['Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)])
-
-    print('Message passing block-wise error percentage', 100*message_passing_block_errors/num_tests)
     if optimal:
-        print('Optimal decoding block-wise error percentage', 100*optimal_decoding_block_errors/num_tests)
+        write_file(filename, average_errors, message_passing_block_errors/num_tests, message_passing_bit_errors/(num_tests*LDPC.n), optimal_decoding_block_errors/num_tests, optimal_decoding_bit_errors/(num_tests*LDPC.n))
+    else:
+        write_file(filename, average_errors, message_passing_block_errors/num_tests, message_passing_bit_errors/(num_tests*LDPC.n))
 
-    print('Message passing bit-wise error percentage', 100*message_passing_bit_errors/(num_tests*LDPC.n))
-    if optimal:
-        print('Optimal decoding bit-wise error percentage', 100*optimal_decoding_bit_errors/(num_tests*LDPC.n)) 
     print(multiprocessing.current_process().name, ' done')
 
-ns = [50, 100, 200, 500, 1000]
-# parameters = [{'BEC': 0.5, 'num_tests':10000, 'iterations':50, 'n':50, 'dv':3, 'dc':6}]
-parameters = []
-# for n in ns:
-#     dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
+# ns = [50, 100, 200, 500, 1000]
+# # parameters = [{'BEC': 0.5, 'num_tests':10000, 'iterations':50, 'n':50, 'dv':3, 'dc':6}]
+# parameters = []
+# # for n in ns:
+# #     dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
+# #     parameters.append(dictionary)
+# #     dictionary = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
+# #     parameters.append(dictionary)
+
+# for i in range(32):
+#     dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':50, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
 #     parameters.append(dictionary)
-#     dictionary = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
-#     parameters.append(dictionary)
 
-for i in range(32):
-    dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':50, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
-    parameters.append(dictionary)
+# if __name__ == '__main__':
+#     pool = multiprocessing.Pool()
+#     for i in range(len(parameters)):
+#         pool.apply_async(run_simulation_fixed_ldpc, args=(parameters[i],))
+#     pool.close()
+#     pool.join()
 
-if __name__ == '__main__':
-    pool = multiprocessing.Pool()
-    for i in range(len(parameters)):
-        pool.apply_async(run_simulation_fixed_ldpc, args=(parameters[i],))
-    pool.close()
-    pool.join()
-
-# run_simulation_fixed_ldpc({'BEC': 0.42, 'num_tests':1000, 'iterations':50, 'n':100, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i})
+# # run_simulation_fixed_ldpc({'BEC': 0.42, 'num_tests':1000, 'iterations':50, 'n':100, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i})
+parameters = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':1000, 'dv':3, 'dc':6, 'optimal':False}
+run_simulation(parameters)

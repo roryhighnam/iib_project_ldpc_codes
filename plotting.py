@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import os
 import csv
 import numpy as np
+from density_evolution import density_evolution
 
 base_dir = './simulation_data'
 plot_base_dir = './simulation_plots/'
@@ -18,7 +19,7 @@ def get_parameters(filename):
     return simulation_parameters_dict
 
 def plot_error_vs_iteration_number(erasure_prob, ns, figure, save_as_filename):
-
+    min_error = erasure_prob
     # Plot simulations with certain erausre_prob for various values of n
     plt.figure(figure)
     for filename in os.listdir(base_dir):
@@ -26,13 +27,15 @@ def plot_error_vs_iteration_number(erasure_prob, ns, figure, save_as_filename):
         simulation_parameters_dict = get_parameters(filename)
 
         if simulation_parameters_dict['BEC'] == str(erasure_prob) and int(simulation_parameters_dict['n']) in ns and 'number' not in simulation_parameters_dict.keys():
-            errors = []
+            errors = [erasure_prob]
 
             with open(base_dir + '/' + filename) as csv_file:
                 csv_reader = csv.reader(csv_file, delimiter=',')
                 for row in csv_reader:
                     if len(row) == 1:
                         errors += row
+                        if float(row[0]) < min_error:
+                            min_error = float(row[0])
             errors = [float(error) for error in errors]
 
             plt.plot(errors, label=simulation_parameters_dict['n'])
@@ -48,13 +51,22 @@ def plot_error_vs_iteration_number(erasure_prob, ns, figure, save_as_filename):
             plt.title(subtitle_text)
     plt.xlabel('Iterations')
     plt.ylabel('Log BER')
+    plt.plot(density_evolution(erasure_prob, int(simulation_parameters_dict['it']), int(simulation_parameters_dict['dv']), int(simulation_parameters_dict['dc']), min_error), '--', label='Density evolution')
+
 
     # Sort legend labels by ascending order
     handles, labels = plt.gca().get_legend_handles_labels()
+    i = labels.index('Density evolution')
+    density_handle = handles[i]
+    density_label = labels[i]
+    handles.pop(i)
+    labels.pop(i)
     labels = [int(label) for label in labels]
     zipped = list(zip(handles, labels))
     zipped.sort(key=lambda tup: tup[1])
     handles, labels = [[i for i,j in zipped], [j for i,j in zipped]]
+    handles.append(density_handle)
+    labels.append(density_label)
     plt.legend(handles, labels)
 
     plt.savefig(plot_base_dir + save_as_filename, bbox_inches='tight')
