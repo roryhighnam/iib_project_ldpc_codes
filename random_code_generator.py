@@ -1,5 +1,9 @@
 import random
 import numpy as np
+import itertools
+from numpy.random import rand
+
+from pyldpc.code import parity_check_matrix
 
 def generate_random_parity_check(n,dv,dc):
 
@@ -59,3 +63,26 @@ def generate_random_parity_check(n,dv,dc):
 
 # print(generate_random_parity_check(500,3,6))
 # print(generate_random_parity_check(11, 3,6))
+
+def generate_random_parity_check_no_checks(n, dv, dc):
+    k = int(n*(1-dv/dc))
+
+    # Randomise 'socket' connections
+    random_vector = np.random.permutation(n*dv)
+
+    # Divide each socket number by dv and round down, to get the values of each variable node
+    random_vector = np.floor(random_vector / dv)
+    random_vector = np.array(random_vector, dtype='int')
+
+    random_vector = np.reshape(random_vector, (n-k, dc))
+
+    parity_check_matrix = np.empty((n-k,n), dtype='bool')
+    
+    for index, check_node in enumerate(random_vector):
+        all_zero = np.zeros(n)
+        np.put(all_zero, check_node, True)
+        parity_check_matrix[index] = all_zero
+    
+    return parity_check_matrix
+
+# generate_random_parity_check_no_checks(100000, 3, 6)

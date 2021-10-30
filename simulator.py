@@ -4,7 +4,7 @@ import galois
 from pyldpc.code import coding_matrix_systematic, coding_matrix
 from pyldpc.utils import gausselimination, gaussjordan
 from channels import BEC
-from random_code_generator import generate_random_parity_check
+from random_code_generator import generate_random_parity_check, generate_random_parity_check_no_checks
 import matplotlib.pyplot as plt
 import csv
 import multiprocessing
@@ -19,9 +19,9 @@ def write_file(filename, errors, message_passing_block_error, message_passing_bi
         writer.writerow(['Message passing block-wise error', message_passing_block_error])
         writer.writerow(['Message passing bit-wise error', message_passing_bit_error])
         if optimal_block_error:
-            writer.writerow(['Optimal decoding block-wise error percentage', optimal_block_error])
+            writer.writerow(['Optimal decoding block-wise error', optimal_block_error])
         if optimal_bit_error:
-            writer.writerow(['Optimal decoding bit-wise error percentage', optimal_bit_error])
+            writer.writerow(['Optimal decoding bit-wise error', optimal_bit_error])
 
 
 class regular_LDPC_code():
@@ -43,7 +43,7 @@ class regular_LDPC_code():
     def optimal_decode(self, binary_sequence):
         '''Use Gaussian Elimination and back subsitution to solve for the erased bits,
         given the values of parity check equations for the non-erased bits. If solution cannot
-        be found, returns -1.'''
+        be found, returns input sequence.'''
         # remaining_parity_checks will contain the columns of the parity check matrix where there are erasures
         remaining_parity_checks = []
         # Conversely, known_parity_checks will contain the columns of the parity check matrix where there are not erasures
@@ -73,7 +73,8 @@ class regular_LDPC_code():
         # Deal with underdetermined matrix or if there are no erasures
         if remaining_parity_checks.shape[0] < binary_sequence.count(0):
             # Should we return corrected bits if we can solve for some bits?
-            return [-1]
+            decoded_values = list(map(lambda x:'?' if x==0 else x, binary_sequence))
+            return list(map(lambda x: 0 if x==-1 else x, decoded_values))
         # Deal with no erasures case
         if len(known_codeword) == self.n:
             return list(map(lambda x: 0 if x==-1 else x, binary_sequence))
@@ -99,8 +100,8 @@ class regular_LDPC_code():
         except:
             # If not enough equations, use gauss jordan elimination to get reduced row echelon form.
             # Now, we can remove columns of resulting matrix which are not only 1 on the diagonal
-            print("Didn't run")
-            return [-1]
+            decoded_values = list(map(lambda x:'?' if x==0 else x, binary_sequence))
+            return list(map(lambda x: 0 if x==-1 else x, decoded_values))
 
         # Finally, loop through input sequence and convert -1s back to 0s and add in our solved unknowns (previously erasures)
         decoded_codeword = []
@@ -114,7 +115,7 @@ class regular_LDPC_code():
                 if solved_unknowns[0] == 2:
                     decoded_codeword += '?'
                 else:
-                    decoded_codeword += [solved_unknowns[0]]
+                    decoded_codeword += [int(solved_unknowns[0])]
                 solved_unknowns = np.delete(solved_unknowns, 0)
         return decoded_codeword
 
@@ -147,9 +148,10 @@ class regular_LDPC_code():
 
         # Initialise v->c messages as the channel output for each variable v
         Mvc = np.array(binary_sequence)
-        errors = []
+        errors = [self.n - np.count_nonzero(Mvc)]
 
         for it in range(max_its):
+
             if 0 in Mvc:
                 # Update Mcv first
                 for index,row in enumerate(self.parity_check):
@@ -206,6 +208,7 @@ class regular_LDPC_code():
 
         # Iterate for a fixed number of iterations, specified by max_its, skip message updates if no erasures in messages
         for it in range(max_its):
+            print(it)
             if 0 in Mvc:
                 # Update Mcv first:
                 for check_node, variable_node_list in check_lookup.items():
@@ -250,8 +253,9 @@ def run_simulation(parameter_set):
     error_counts = np.zeros(iterations+1)
     i = 0
     while i<num_tests and message_passing_block_errors<200:
+        print(i)
 
-        parity_check = generate_random_parity_check(n,dv,dc)
+        parity_check = generate_random_parity_check_no_checks(n,dv,dc)
         if len(parity_check) == 1:
             continue
 
@@ -261,7 +265,7 @@ def run_simulation(parameter_set):
         # print('Generated Codeword:', LDPC.encode(test_sequence))
         channel_output = sim_BEC.transmit(codeword)
 
-        decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations)
+        decoded_codeword, errors = LDPC.new_message_pass_decode(channel_output, iterations)
 
         error_counts += errors
 
@@ -320,7 +324,7 @@ def run_simulation_fixed_ldpc(parameter_set):
     average_errors = []
     parity_check = [0]
     while len(parity_check)==1:
-        parity_check = generate_random_parity_check(n,dv,dc)
+        parity_check = generate_random_parity_check_no_checks(n,dv,dc)
 
     LDPC = regular_LDPC_code(parity_check)
     codeword = np.zeros(LDPC.n)
@@ -329,7 +333,7 @@ def run_simulation_fixed_ldpc(parameter_set):
 
         channel_output = sim_BEC.transmit(codeword)
 
-        decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations+1)
+        decoded_codeword, errors = LDPC.new_message_pass_decode(channel_output, iterations+1)
 
         if len(average_errors) == 0:
             average_errors += errors
@@ -389,5 +393,24 @@ def run_simulation_fixed_ldpc(parameter_set):
 #     pool.join()
 
 # # run_simulation_fixed_ldpc({'BEC': 0.42, 'num_tests':1000, 'iterations':50, 'n':100, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i})
-parameters = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':200, 'dv':3, 'dc':6, 'optimal':False}
+# parameters = {'BEC': 0.53, 'num_tests':10000, 'iterations':50, 'n':200, 'dv':3, 'dc':6, 'optimal':False}
+# run_simulation(parameters)
+
+# errors = 0
+# for it in range(10000):
+#     parity_check = generate_random_parity_check(200, 3, 6)
+#     LDPC = regular_LDPC_code(parity_check)
+#     myBEC = BEC(0.35)
+
+#     input_sequence = np.random.randint(0,2,LDPC.k)
+#     channel_input = LDPC.encode(input_sequence)
+#     channel_output = myBEC.transmit(channel_input)
+#     decoded_codeword = LDPC.optimal_decode(channel_output)
+
+#     for i in range(len(decoded_codeword)):
+#         if decoded_codeword[i] != channel_input[i]:
+#             errors += 1
+
+# print(errors / (LDPC.n*it))
+parameters = {'BEC': 0.45, 'num_tests':10000, 'iterations':200, 'n':10000, 'dv':3, 'dc':6, 'optimal':False}
 run_simulation(parameters)
