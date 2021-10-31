@@ -58,12 +58,6 @@ def generate_random_parity_check(n,dv,dc):
         parity_check_matrixT[variable_node][connected_check_nodes] = 1
     return np.array(parity_check_matrixT, dtype='int0').T
 
-# for i in range(10):
-#     print(generate_random_parity_check(10,5,3,6))
-
-# print(generate_random_parity_check(500,3,6))
-# print(generate_random_parity_check(11, 3,6))
-
 def generate_random_parity_check_no_checks(n, dv, dc):
     k = int(n*(1-dv/dc))
 
@@ -71,7 +65,7 @@ def generate_random_parity_check_no_checks(n, dv, dc):
     random_vector = np.random.permutation(n*dv)
 
     # Divide each socket number by dv and round down, to get the values of each variable node
-    random_vector = np.floor(random_vector / dv)
+    random_vector = random_vector // dv
     random_vector = np.array(random_vector, dtype='int')
 
     random_vector = np.reshape(random_vector, (n-k, dc))
@@ -79,10 +73,15 @@ def generate_random_parity_check_no_checks(n, dv, dc):
     parity_check_matrix = np.empty((n-k,n), dtype='bool')
     
     for index, check_node in enumerate(random_vector):
-        all_zero = np.zeros(n)
-        np.put(all_zero, check_node, True)
-        parity_check_matrix[index] = all_zero
+        if len(np.unique(check_node)) == dc:
+            all_zero = np.zeros(n)
+            np.put(all_zero, check_node, True)
+            parity_check_matrix[index] = all_zero
+        else:
+            return generate_random_parity_check_no_checks(n,dv,dc)
     
     return parity_check_matrix
 
-# generate_random_parity_check_no_checks(100000, 3, 6)
+for i in range(1000):
+    print(i)
+    generate_random_parity_check_no_checks(10000,3,6)
