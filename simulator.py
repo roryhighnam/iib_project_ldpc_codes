@@ -1,4 +1,5 @@
 from random import gauss
+from numba.core.types.scalars import Boolean
 import numpy as np
 import galois
 from pyldpc.code import coding_matrix_systematic, coding_matrix
@@ -10,6 +11,7 @@ import csv
 import multiprocessing
 import cProfile
 import re
+import numba
 
 def write_file(filename, errors, message_passing_block_error, message_passing_bit_error, optimal_block_error=None, optimal_bit_error=None):
     with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
@@ -23,6 +25,29 @@ def write_file(filename, errors, message_passing_block_error, message_passing_bi
         if optimal_bit_error:
             writer.writerow(['Optimal decoding bit-wise error', optimal_bit_error])
 
+@numba.jit
+def compute_cv_message(inputs):
+    '''Function to compute the check->variable message. Pass in all variable->check 
+    messages except from the variable you are sending message to'''
+    if 0 in inputs:
+        return 0
+    else:
+        modified_inputs = np.where(inputs==-1, 0, inputs)
+        if np.sum(modified_inputs)%2 == 0:
+            return -1
+        else:
+            return 1
+
+@numba.jit
+def compute_vc_message(inputs):
+    '''Function to compute v->c message. Pass in all check->variable messages
+    except from the check you are sending message to.'''
+    if -1 in inputs:
+        return -1
+    elif 1 in inputs:
+        return 1
+    else:
+        return 0
 
 class regular_LDPC_code():
 
@@ -119,28 +144,6 @@ class regular_LDPC_code():
                 solved_unknowns = np.delete(solved_unknowns, 0)
         return decoded_codeword
 
-    def compute_cv_message(self, inputs):
-        '''Function to compute the check->variable message. Pass in all variable->check 
-        messages except from the variable you are sending message to'''
-        if 0 in inputs:
-            return 0
-        else:
-            modified_inputs = list(map(lambda x: 0 if x==-1 else x, inputs))
-            if sum(modified_inputs)%2 == 0:
-                return -1
-            else:
-                return 1
-    
-    def compute_vc_message(self, inputs):
-        '''Function to compute v->c message. Pass in all check->variable messages
-        except from the check you are sending message to.'''
-        if -1 in inputs:
-            return -1
-        elif 1 in inputs:
-            return 1
-        else:
-            return 0
-
     def new_message_pass_decode(self, binary_sequence, max_its):
         # Matrices that contain all message updates - not very memory efficient for larger codes
         Mcv = np.zeros_like(self.parity_check)
@@ -159,7 +162,7 @@ class regular_LDPC_code():
                     for variable_node in variable_nodes:
                         other_variable_nodes = list(variable_nodes.copy())
                         other_variable_nodes.remove(variable_node)
-                        Mcv[index][variable_node] = self.compute_cv_message(Mvc[other_variable_nodes])
+                        Mcv[index][variable_node] = compute_cv_message(Mvc[other_variable_nodes])
 
                 # Then update Mvc
                 for index,column in enumerate(self.parity_check.T):
@@ -168,7 +171,7 @@ class regular_LDPC_code():
                         for check_node in check_nodes:
                             other_check_nodes = list(check_nodes.copy())
                             other_check_nodes.remove(check_node)
-                            Mvc[index] = self.compute_vc_message(Mcv.T[index][other_check_nodes])
+                            Mvc[index] = compute_vc_message(Mcv.T[index][other_check_nodes])
             errors.append(self.n - np.count_nonzero(Mvc))
         # Convert decoded values back to binary list, leaving '?' if erasures still present
         decoded_values = list(map(lambda x:'?' if x==0 else x, Mvc))
@@ -266,6 +269,7 @@ def run_simulation(parameter_set):
         channel_output = sim_BEC.transmit(codeword)
 
         decoded_codeword, errors = LDPC.new_message_pass_decode(channel_output, iterations)
+        # decoded_codeword, errors = message_pass_decode(channel_output, LDPC.parity_check, iterations)
 
         error_counts += errors
 
@@ -412,5 +416,5 @@ def run_simulation_fixed_ldpc(parameter_set):
 #             errors += 1
 
 # print(errors / (LDPC.n*it))
-parameters = {'BEC': 0.45, 'num_tests':10000, 'iterations':200, 'n':10000, 'dv':3, 'dc':6, 'optimal':False}
+parameters = {'BEC': 0.4, 'num_tests':10000, 'iterations':200, 'n':10000, 'dv':3, 'dc':6, 'optimal':False}
 run_simulation(parameters)
