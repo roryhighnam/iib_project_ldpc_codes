@@ -251,23 +251,23 @@ def plot_error_vs_erasure_prob(n, figure, save_as_filename):
 
     plt.savefig(plot_base_dir + save_as_filename, bbox_inches='tight')
 
-erasure_probs = [0.3, 0.4, 0.42, 0.43]
-ns = [50,100,200,500,1000]
+# erasure_probs = [0.3, 0.4, 0.42, 0.43]
+# ns = [50,100,200,500,1000]
 figure = 1
-for erasure_prob in erasure_probs:
-    plot_error_vs_iteration_number(erasure_prob, ns, figure, 'BEC='+str(erasure_prob)+'_varying_n.jpg')
-    figure += 1
+# for erasure_prob in erasure_probs:
+#     plot_error_vs_iteration_number(erasure_prob, ns, figure, 'BEC='+str(erasure_prob)+'_varying_n.jpg')
+#     figure += 1
 
-plot_error_vs_n(0.4, figure, 'BEC=0.4_error_against_n.jpg')
-figure += 1
+# plot_error_vs_n(0.4, figure, 'BEC=0.4_error_against_n.jpg')
+# figure += 1
 
-erasure_probs = [0.3, 0.4, 0.42]
-for erasure_prob in erasure_probs:
-    plot_concentration(erasure_prob, 200, figure, 'BEC='+str(erasure_prob)+'_concentration.jpg')
-    figure += 1
+# erasure_probs = [0.3, 0.4, 0.42]
+# for erasure_prob in erasure_probs:
+#     plot_concentration(erasure_prob, 200, figure, 'BEC='+str(erasure_prob)+'_concentration.jpg')
+#     figure += 1
 
 plot_error_vs_erasure_prob_fixed_code(512, figure, 'n=512_varying_erasure_prob.jpg')
 figure += 1
 
-plot_error_vs_erasure_prob(200, figure, 'n=200_varying_erasure_prob.jpg')
-figure += 1
+# plot_error_vs_erasure_prob(200, figure, 'n=200_varying_erasure_prob.jpg')
+# figure += 1

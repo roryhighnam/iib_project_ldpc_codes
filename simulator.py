@@ -50,7 +50,7 @@ def compute_vc_message(inputs):
 class regular_LDPC_code():
 
     def __init__(self,parity_check):
-        # self.generator_matrix = coding_matrix(parity_check)
+        self.generator_matrix = coding_matrix(parity_check)
         self.parity_check = parity_check
         self.n = len(parity_check[0])
         self.k =  len(parity_check[0]) - len(parity_check)
@@ -296,7 +296,7 @@ def run_simulation(parameter_set):
     print(multiprocessing.current_process().name, ' done')
 
 def run_simulation_fixed_ldpc(parameter_set):
-    sim_BEC = BEC(parameter_set['BEC'])
+    sim_BECs = parameter_set['BEC']
 
     num_tests = parameter_set['num_tests']
     iterations = parameter_set['iterations']
@@ -306,77 +306,88 @@ def run_simulation_fixed_ldpc(parameter_set):
     optimal = parameter_set['optimal']
     filenumber = parameter_set['filenumber']
 
-    message_passing_block_errors = 0
-    message_passing_bit_errors= 0
-    if optimal:
-        optimal_decoding_block_errors = 0
-        optimal_decoding_bit_errors = 0
-
-    average_errors = []
     parity_check = [0]
     while len(parity_check)==1:
         parity_check = generate_random_parity_check_no_checks(n,dv,dc)
 
+    parity_check = np.array(parity_check, dtype='int8')
     LDPC = regular_LDPC_code(parity_check)
     codeword = np.zeros(LDPC.n)
 
-    for i in range(num_tests):
-
-        channel_output = sim_BEC.transmit(codeword)
-
-        decoded_codeword, errors = LDPC.new_message_pass_decode(channel_output, iterations+1)
-
-        if len(average_errors) == 0:
-            average_errors += errors
-            average_errors = np.array(average_errors)
-        else:
-            average_errors = average_errors*i + errors
-            average_errors = average_errors / (i+1)
-
-        if '?' in decoded_codeword:
-            message_passing_block_errors += 1
+    for BEC_value in sim_BECs:
+        print(BEC_value)
+        message_passing_block_errors = 0
+        message_passing_bit_errors= 0
         if optimal:
-            optimal_decoded_codeword = LDPC.optimal_decode(channel_output)
-            if '?' in optimal_decoded_codeword or -1 in optimal_decoded_codeword:
-                optimal_decoding_block_errors += 1
+            optimal_decoding_block_errors = 0
+            optimal_decoding_bit_errors = 0
+        sim_BEC = BEC(BEC_value)
+        average_errors = []
 
-            optimal_decoding_bit_errors += optimal_decoded_codeword.count('?')
-        message_passing_bit_errors += decoded_codeword.count('?')
+        i = 0
+        print('num_tests', num_tests)
 
-    average_errors = average_errors / LDPC.n
+        while i<num_tests and message_passing_block_errors<200:
+            print(i)
+            channel_output = sim_BEC.transmit(codeword)
 
-    filename = 'regular_code'
-    filename += '_code_number=' + str(filenumber)
-    filename += '_BEC=' + str(sim_BEC.erasure_prob)
-    filename += '_n=' + str(LDPC.n)
-    filename += '_k=' + str(LDPC.k)
-    filename += '_dv=' + str(LDPC.dv)
-    filename += '_dc=' + str(LDPC.dc)
-    filename += '_it=' + str(iterations)
-    filename += '_num=' + str(num_tests)
-    filename += '.csv'
+            decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations)
 
-    if optimal:
-        write_file(filename, average_errors, message_passing_block_errors/num_tests, message_passing_bit_errors/(num_tests*LDPC.n), optimal_decoding_block_errors/num_tests, optimal_decoding_bit_errors/(num_tests*LDPC.n))
-    else:
-        write_file(filename, average_errors, message_passing_block_errors/num_tests, message_passing_bit_errors/(num_tests*LDPC.n))
+            if len(average_errors) == 0:
+                average_errors += errors
+                average_errors = np.array(average_errors)
+            else:
+                average_errors = average_errors*i + errors
+                average_errors = average_errors / (i+1)
+
+            if errors[-1] != 0:
+                message_passing_block_errors += 1
+            # if '?' in decoded_codeword:
+            #     message_passing_block_errors += 1
+            if optimal:
+                optimal_decoded_codeword = LDPC.optimal_decode(channel_output)
+                if '?' in optimal_decoded_codeword or -1 in optimal_decoded_codeword:
+                    optimal_decoding_block_errors += 1
+
+                optimal_decoding_bit_errors += optimal_decoded_codeword.count('?')
+            message_passing_bit_errors += decoded_codeword.count('?')
+            i += 1
+        average_errors = average_errors / LDPC.n
+
+        filename = 'regular_code'
+        filename += '_code_number=' + str(filenumber)
+        filename += '_BEC=' + str(sim_BEC.erasure_prob)
+        filename += '_n=' + str(LDPC.n)
+        filename += '_k=' + str(LDPC.k)
+        filename += '_dv=' + str(LDPC.dv)
+        filename += '_dc=' + str(LDPC.dc)
+        filename += '_it=' + str(iterations)
+        filename += '_num=' + str(i)
+        filename += '.csv'
+
+        if optimal:
+            write_file(filename, average_errors, message_passing_block_errors/i, message_passing_bit_errors/(i*LDPC.n), optimal_decoding_block_errors/i, optimal_decoding_bit_errors/(i*LDPC.n))
+        else:
+            write_file(filename, average_errors, message_passing_block_errors/i, message_passing_bit_errors/(i*LDPC.n))
 
     print(multiprocessing.current_process().name, ' done')
 
 # ns = [50, 100, 200, 500, 1000]
 # # parameters = [{'BEC': 0.5, 'num_tests':10000, 'iterations':50, 'n':50, 'dv':3, 'dc':6}]
-# parameters = []
+parameters = []
 # # for n in ns:
 # #     dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
 # #     parameters.append(dictionary)
 # #     dictionary = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
 # #     parameters.append(dictionary)
 
-# for i in range(32):
-#     dictionary = {'BEC': 0.42, 'num_tests':10000, 'iterations':50, 'n':50, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
-#     parameters.append(dictionary)
+BECs = np.arange(0.5, 0.29, -0.02)
+for i in range(8):
+    dictionary = {'BEC': BECs, 'num_tests':100000, 'iterations':200, 'n':512, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
+    run_simulation_fixed_ldpc(dictionary)
 
 # if __name__ == '__main__':
+#     print('running')
 #     pool = multiprocessing.Pool()
 #     for i in range(len(parameters)):
 #         pool.apply_async(run_simulation_fixed_ldpc, args=(parameters[i],))
@@ -388,20 +399,26 @@ def run_simulation_fixed_ldpc(parameter_set):
 # run_simulation(parameters)
 
 # errors = 0
-# for it in range(10000):
-#     parity_check = generate_random_parity_check(200, 3, 6)
+# it = 0
+# while it < 10000:
+#     parity_check = generate_random_parity_check_no_checks(200, 3, 6)
+#     if len(parity_check) == 1:
+#         continue
+#     print(it)
+#     parity_check = np.array(parity_check, dtype='int8')
 #     LDPC = regular_LDPC_code(parity_check)
-#     myBEC = BEC(0.35)
+#     myBEC = BEC(0.4)
 
 #     input_sequence = np.random.randint(0,2,LDPC.k)
 #     channel_input = LDPC.encode(input_sequence)
-#     channel_output = myBEC.transmit(channel_input)
+#     channel_output = list(myBEC.transmit(channel_input))
 #     decoded_codeword = LDPC.optimal_decode(channel_output)
 
 #     for i in range(len(decoded_codeword)):
 #         if decoded_codeword[i] != channel_input[i]:
 #             errors += 1
+#     it += 1
 
 # print(errors / (LDPC.n*it))
-parameters = {'BEC': 0.4, 'num_tests':5000, 'iterations':200, 'n':10000, 'dv':3, 'dc':6, 'optimal':False}
-run_simulation(parameters)
+# parameters = {'BEC': 0.4, 'num_tests':5000, 'iterations':200, 'n':10000, 'dv':3, 'dc':6, 'optimal':False}
+# run_simulation(parameters)
