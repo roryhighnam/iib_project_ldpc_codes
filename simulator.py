@@ -1,5 +1,3 @@
-from random import gauss
-from numba.core.types.scalars import Boolean
 import numpy as np
 import galois
 from pyldpc.code import coding_matrix_systematic, coding_matrix

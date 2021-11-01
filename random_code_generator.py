@@ -78,10 +78,6 @@ def generate_random_parity_check_no_checks(n, dv, dc):
             np.put(all_zero, check_node, True)
             parity_check_matrix[index] = all_zero
         else:
-            return generate_random_parity_check_no_checks(n,dv,dc)
+            return [0]
     
     return parity_check_matrix
-
-for i in range(1000):
-    print(i)
-    generate_random_parity_check_no_checks(10000,3,6)
