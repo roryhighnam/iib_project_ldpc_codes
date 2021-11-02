@@ -50,7 +50,7 @@ def compute_vc_message(inputs):
 class regular_LDPC_code():
 
     def __init__(self,parity_check):
-        self.generator_matrix = coding_matrix(parity_check)
+        # self.generator_matrix = coding_matrix(parity_check)
         self.parity_check = parity_check
         self.n = len(parity_check[0])
         self.k =  len(parity_check[0]) - len(parity_check)
@@ -310,6 +310,9 @@ def run_simulation_fixed_ldpc(parameter_set):
     while len(parity_check)==1:
         parity_check = generate_random_parity_check_no_checks(n,dv,dc)
 
+    with open('./parity_checks/code_no_'+str(filenumber)+'.npy', 'wb') as f:
+        np.save(f, parity_check)
+
     parity_check = np.array(parity_check, dtype='int8')
     LDPC = regular_LDPC_code(parity_check)
     codeword = np.zeros(LDPC.n)
@@ -383,7 +386,7 @@ parameters = []
 
 BECs = np.arange(0.5, 0.29, -0.02)
 for i in range(8):
-    dictionary = {'BEC': BECs, 'num_tests':100000, 'iterations':200, 'n':512, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
+    dictionary = {'BEC': BECs, 'num_tests':100, 'iterations':200, 'n':512, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
     run_simulation_fixed_ldpc(dictionary)
 
 # if __name__ == '__main__':
