@@ -331,7 +331,8 @@ def run_simulation_fixed_ldpc(parameter_set):
         print('num_tests', num_tests)
 
         while i<num_tests and message_passing_block_errors<200:
-            print(i)
+            if i%1000==0:
+                print(i)
             channel_output = sim_BEC.transmit(codeword)
 
             decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations)
@@ -384,10 +385,9 @@ parameters = []
 # #     dictionary = {'BEC': 0.43, 'num_tests':10000, 'iterations':50, 'n':n, 'dv':3, 'dc':6, 'optimal':True}
 # #     parameters.append(dictionary)
 
-BECs = np.arange(0.5, 0.29, -0.02)
-for i in range(8):
-    dictionary = {'BEC': BECs, 'num_tests':100, 'iterations':200, 'n':512, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i}
-    run_simulation_fixed_ldpc(dictionary)
+BECs = np.arange(0.3, 0.51, 0.02)
+dictionary = {'BEC': BECs, 'num_tests':100000, 'iterations':200, 'n':512, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':1}
+run_simulation_fixed_ldpc(dictionary)
 
 # if __name__ == '__main__':
 #     print('running')
