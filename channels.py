@@ -20,3 +20,7 @@ class BEC:
         input_binary = np.where(input_binary==0, -1, input_binary)
         random_vector = np.random.rand(len(input_binary))
         return np.where(random_vector<self.erasure_prob, 0, input_binary)
+    
+    def new_transmit(self, input_binary):
+        random_vector = np.random.rand(len(input_binary))
+        return np.where(random_vector<self.erasure_prob, 2, input_binary)
