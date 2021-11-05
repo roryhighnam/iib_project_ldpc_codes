@@ -17,7 +17,7 @@ void shuffle(int *arr, int n) {
     }
 }
 
-int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check_lookup, int *parity_check, int iterations) {
+int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check_lookup, bool *parity_check, int iterations) {
 
     if (iterations > 1000000) {
         return 0;

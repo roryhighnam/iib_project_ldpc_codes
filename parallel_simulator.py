@@ -120,18 +120,18 @@ class regular_LDPC_code():
                 solved_unknowns = np.delete(solved_unknowns, 0)
         return decoded_codeword
 
-    def message_pass_decode(self, binary_sequence, max_its):
+    def message_pass_decode(self, binary_sequence, max_its, check_lookup, variable_lookup):
         # Generate lookup tables for connected variable and check nodes ie dictionary 
         # with each check as key and connected variables list as value
-        check_lookup = []
-        for row in self.parity_check:
-            check_list = list(np.nonzero(row==1)[0])
-            check_lookup.append(check_list)
+        # check_lookup = []
+        # for row in self.parity_check:
+        #     check_list = list(np.nonzero(row==1)[0])
+        #     check_lookup.append(check_list)
 
-        variable_lookup = []
-        for col in self.parity_check.T:
-            var_list = list(np.nonzero(col==1)[0])
-            variable_lookup.append(var_list)
+        # variable_lookup = []
+        # for col in self.parity_check.T:
+        #     var_list = list(np.nonzero(col==1)[0])
+        #     variable_lookup.append(var_list)
         
         # Prepare variables for passing to C library
         check_lookup = np.array(check_lookup, dtype='int32').flatten()
@@ -151,7 +151,7 @@ class regular_LDPC_code():
         dv_p = ct.c_int(self.dv)
         dc_p = ct.c_int(self.dc)
 
-        c_message_pass = ct.CDLL('./message_passing.so')
+        c_message_pass = ct.CDLL(base_directory + 'message_passing.so')
 
         it = c_message_pass.message_passing(binary_sequence_p, max_its_p, variable_lookup_p, check_lookup_p, errors_p, n_p, k_p, dv_p, dc_p)
         errors = np.insert(errors, 0, initial_error_count)
@@ -183,16 +183,16 @@ def run_simulation(parameter_set):
     i = 0
     it = 0
 
-    c_random_code = ct.CDLL('./random_code_generator.so')
+    c_random_code = ct.CDLL(base_directory + 'random_code_generator.so')
 
     while i<num_tests and message_passing_block_errors<200:
 
         check_lookup = np.zeros(n*dv, dtype='int32')
         variable_lookup = np.zeros(n*dv, dtype='int32')
-        parity_check = np.zeros(n*(n-k), dtype='int32')
+        parity_check = np.zeros(n*(n-k), dtype='bool')
         check_lookup_p = check_lookup.ctypes.data_as(ct.POINTER(ct.c_int))
         variable_lookup_p = variable_lookup.ctypes.data_as(ct.POINTER(ct.c_int))
-        parity_check_p = parity_check.ctypes.data_as(ct.POINTER(ct.c_int))
+        parity_check_p = parity_check.ctypes.data_as(ct.POINTER(ct.c_bool))
 
         it_p = ct.c_int(it)
         n_p = ct.c_int(n)
@@ -213,7 +213,7 @@ def run_simulation(parameter_set):
         codeword = np.zeros(LDPC.n)
 
         channel_output = sim_BEC.new_transmit(codeword)
-        decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations)
+        decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations, check_lookup, variable_lookup)
         # decoded_codeword, errors = message_pass_decode(channel_output, LDPC.parity_check, iterations)
 
         error_counts += errors
