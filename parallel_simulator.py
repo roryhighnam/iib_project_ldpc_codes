@@ -3,7 +3,7 @@ from numpy.core.fromnumeric import var
 from pyldpc.code import coding_matrix_systematic, coding_matrix
 from pyldpc.utils import gausselimination, gaussjordan
 from channels import BEC
-from random_code_generator import generate_random_parity_check, generate_random_parity_check_no_checks
+from random_code_generator_python import generate_random_parity_check, generate_random_parity_check_no_checks
 import matplotlib.pyplot as plt
 import csv
 import multiprocessing
@@ -132,12 +132,14 @@ class regular_LDPC_code():
         for col in self.parity_check.T:
             var_list = list(np.nonzero(col==1)[0])
             variable_lookup.append(var_list)
-
+        
         # Prepare variables for passing to C library
         check_lookup = np.array(check_lookup, dtype='int32').flatten()
         variable_lookup = np.array(variable_lookup, dtype='int32').flatten()
         errors = np.zeros(max_its, dtype='int32')
-        binary_sequence = np.array(binary_sequence, dtype='int8')
+        initial_error_count = len(np.nonzero(binary_sequence==2)[0])
+        binary_sequence = np.array(binary_sequence, dtype='int32')
+
 
         binary_sequence_p = binary_sequence.ctypes.data_as(ct.POINTER(ct.c_int))
         check_lookup_p = check_lookup.ctypes.data_as(ct.POINTER(ct.c_int))
@@ -152,6 +154,7 @@ class regular_LDPC_code():
         c_message_pass = ct.CDLL('./message_passing.so')
 
         it = c_message_pass.message_passing(binary_sequence_p, max_its_p, variable_lookup_p, check_lookup_p, errors_p, n_p, k_p, dv_p, dc_p)
+        errors = np.insert(errors, 0, initial_error_count)
         return binary_sequence, errors
         
         # decoded_values = list(map(lambda x:'?' if x==0 else x, Mvc))
@@ -167,6 +170,7 @@ def run_simulation(parameter_set):
     dv = parameter_set['dv']
     dc = parameter_set['dc']
     optimal = parameter_set['optimal']
+    k = int(n*(dc-dv)/dc)
 
     message_passing_block_errors = 0
     message_passing_bit_errors= 0
@@ -177,24 +181,44 @@ def run_simulation(parameter_set):
     # average_errors = []
     error_counts = np.zeros(iterations+1)
     i = 0
-    while i<num_tests and message_passing_block_errors<200:
-        print(i)
+    it = 0
 
-        parity_check = generate_random_parity_check_no_checks(n,dv,dc)
-        if len(parity_check) == 1:
-            continue
+    c_random_code = ct.CDLL('./random_code_generator.so')
+
+    while i<num_tests and message_passing_block_errors<200:
+
+        check_lookup = np.zeros(n*dv, dtype='int32')
+        variable_lookup = np.zeros(n*dv, dtype='int32')
+        parity_check = np.zeros(n*(n-k), dtype='int32')
+        check_lookup_p = check_lookup.ctypes.data_as(ct.POINTER(ct.c_int))
+        variable_lookup_p = variable_lookup.ctypes.data_as(ct.POINTER(ct.c_int))
+        parity_check_p = parity_check.ctypes.data_as(ct.POINTER(ct.c_int))
+
+        it_p = ct.c_int(it)
+        n_p = ct.c_int(n)
+        dv_p = ct.c_int(dv)
+        dc_p = ct.c_int(dc)
+
+        success = c_random_code.generate_random_code(n_p, dv_p, dc_p, variable_lookup_p, check_lookup_p, parity_check_p, it_p)
+        # print('Success', success)
+        parity_check = np.reshape(parity_check, (n-k,n))
+        # print(parity_check)
+
+        # parity_check = generate_random_parity_check_no_checks(n,dv,dc)
+        # if len(parity_check) == 1:
+        #     continue
+        print(i)
 
         LDPC = regular_LDPC_code(parity_check)
         codeword = np.zeros(LDPC.n)
 
-        channel_output = sim_BEC.transmit(codeword)
+        channel_output = sim_BEC.new_transmit(codeword)
         decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations)
         # decoded_codeword, errors = message_pass_decode(channel_output, LDPC.parity_check, iterations)
 
         error_counts += errors
 
-
-        if '?' in decoded_codeword:
+        if errors[-1] != 0:
             message_passing_block_errors += 1
         if optimal:
             optimal_decoded_codeword = LDPC.optimal_decode(channel_output)
@@ -202,13 +226,11 @@ def run_simulation(parameter_set):
                 optimal_decoding_block_errors += 1
 
             optimal_decoding_bit_errors += optimal_decoded_codeword.count('?')
-        message_passing_bit_errors += decoded_codeword.count('?')
+        message_passing_bit_errors += errors[-1]
 
         i += 1
 
     num_tests = i
-
-    # average_errors = average_errors / LDPC.n
 
     average_errors = error_counts / (LDPC.n*num_tests)
 
@@ -326,8 +348,9 @@ iterations = int(sys.argv[3])
 n = int(sys.argv[4])
 dv = int(sys.argv[5])
 dc = int(sys.argv[6])
-filenumber = int(sys.argv[7])
 
-dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False, 'filenumber':filenumber}
-run_simulation_fixed_ldpc(dictionary)
+# dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False, 'filenumber':filenumber}
+# run_simulation_fixed_ldpc(dictionary)
 
+dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False}
+run_simulation(dictionary)

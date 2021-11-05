@@ -1,9 +1,5 @@
 import random
 import numpy as np
-import itertools
-from numpy.random import rand
-
-from pyldpc.code import parity_check_matrix
 
 def generate_random_parity_check(n,dv,dc):
 
@@ -11,7 +7,6 @@ def generate_random_parity_check(n,dv,dc):
         return [0]
 
     k = int(n*(1-dv/dc))
-
 
     # Generate a list containing each check node dc times which will be used to draw from
     check_nodes_available = []
@@ -81,3 +76,12 @@ def generate_random_parity_check_no_checks(n, dv, dc):
             return [0]
     
     return parity_check_matrix
+
+# print("Starting test run")
+# i = 0
+# while i<100:
+#     if len(generate_random_parity_check_no_checks(10000,3,6)) == 1:
+#         continue
+#     print(i)
+#     i += 1
+# print("Done test run")

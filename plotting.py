@@ -5,7 +5,7 @@ import numpy as np
 from density_evolution import density_evolution
 
 base_dir = './simulation_data'
-plot_base_dir = './simulation_plots/'
+plot_base_dir = './all_simulation_plots/'
 
 def get_parameters(filename):
     # Get simulation parameters from filename
@@ -14,6 +14,8 @@ def get_parameters(filename):
     for simulation_parameter in simulation_parameters:
         if '=' in simulation_parameter and '.csv' not in simulation_parameter:
             simulation_parameters_dict[simulation_parameter.split('=')[0]] = simulation_parameter.split('=')[1]
+        elif 'combined.csv' in simulation_parameter:
+            simulation_parameters_dict['combined'] = 'true'
         elif '.csv' in simulation_parameter:
             simulation_parameters_dict[simulation_parameter.split('=')[0]] = simulation_parameter.split('=')[1].split('.')[0]
     return simulation_parameters_dict
@@ -43,7 +45,7 @@ def plot_error_vs_iteration_number(erasure_prob, ns, figure, save_as_filename):
             plt.suptitle('Regular LDPC code simulation', fontsize='18')
             subtitle_text = ''
             for parameter in simulation_parameters_dict.keys():
-                if parameter != 'n' and parameter != 'k':
+                if parameter != 'n' and parameter != 'k' and parameter != 'num':
                     subtitle_text += parameter
                     subtitle_text += '='
                     subtitle_text += simulation_parameters_dict[parameter]
@@ -203,6 +205,49 @@ def plot_error_vs_erasure_prob_fixed_code(n, figure, save_as_filename):
 
     plt.savefig(plot_base_dir + save_as_filename, bbox_inches='tight')
 
+def plot_error_vs_erasure_prob_fixed_code_combined(n, figure, save_as_filename):
+    final_errors = {}
+    # Plot simulations of error prob vs erasure prob
+    plt.figure(figure)
+    for filename in os.listdir(base_dir):
+
+        simulation_parameters_dict = get_parameters(filename)
+
+        if True:
+            print(filename)
+            if simulation_parameters_dict['n'] == str(n) and 'number' in simulation_parameters_dict.keys():
+                # final_errors = []
+
+                with open(base_dir + '/' + filename) as csv_file:
+                    csv_reader = csv.reader(csv_file, delimiter=',')
+                    for row in csv_reader:
+                        if csv_reader.line_num == 51:
+                            if simulation_parameters_dict['number'] in final_errors.keys():
+                                final_errors[simulation_parameters_dict['number']].append((float(simulation_parameters_dict['BEC']), float(row[0])))
+                            else:
+                                final_errors[simulation_parameters_dict['number']] = [(float(simulation_parameters_dict['BEC']), float(row[0]))]
+
+                # plt.plot(errors)
+                plt.yscale('log')
+                plt.suptitle('Regular LDPC code simulation', fontsize='18')
+                subtitle_text = ''
+                for parameter in simulation_parameters_dict.keys():
+                    if parameter != 'k' and parameter != 'number' and parameter != 'BEC' and parameter != 'combined':
+                        subtitle_text += parameter
+                        subtitle_text += '='
+                        subtitle_text += simulation_parameters_dict[parameter]
+                        subtitle_text += '  '
+    subtitle_text += 'count='+str(len(final_errors.keys()))
+    for key,value in final_errors.items():
+        value.sort(key=lambda tup: tup[0])
+        ns, final_errors = [[i for i,j in value], [j for i,j in value]]
+        plt.plot(ns, final_errors)
+    plt.title(subtitle_text)
+    plt.xlabel('Erasure Probability')
+    plt.ylabel('Log BER')
+
+    plt.savefig(plot_base_dir + save_as_filename, bbox_inches='tight')
+
 def plot_error_vs_erasure_prob(n, figure, save_as_filename):
     # Plot simulations with certain erausre_prob against n for fixed code parameters
     final_errors = []
@@ -266,8 +311,14 @@ figure = 1
 #     plot_concentration(erasure_prob, 200, figure, 'BEC='+str(erasure_prob)+'_concentration.jpg')
 #     figure += 1
 
-plot_error_vs_erasure_prob_fixed_code(512, figure, 'n=512_varying_erasure_prob.jpg')
-figure += 1
+# plot_error_vs_erasure_prob_fixed_code_combined(512, figure, 'n=512_varying_erasure_prob.jpg')
+# figure += 1
 
+plot_error_vs_iteration_number(0.42, [50,100,200,500,1000,10000], figure, 'BEC=0.42_n=10000_vs_iteration_number.jpg')
+figure += 1
+plot_error_vs_iteration_number(0.43, [50,100,200,500,1000,10000], figure, 'BEC=0.43_n=10000_vs_iteration_number.jpg')
+figure += 1
+plot_error_vs_iteration_number(0.5, [50,100,200,500,1000,10000], figure, 'BEC=0.5_n=10000_vs_iteration_number.jpg')
+figure += 1
 # plot_error_vs_erasure_prob(200, figure, 'n=200_varying_erasure_prob.jpg')
 # figure += 1

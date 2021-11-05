@@ -400,7 +400,6 @@ run_simulation_fixed_ldpc(dictionary)
 # # run_simulation_fixed_ldpc({'BEC': 0.42, 'num_tests':1000, 'iterations':50, 'n':100, 'dv':3, 'dc':6, 'optimal':False, 'filenumber':i})
 # parameters = {'BEC': 0.53, 'num_tests':10000, 'iterations':50, 'n':200, 'dv':3, 'dc':6, 'optimal':False}
 # run_simulation(parameters)
-
 # errors = 0
 # it = 0
 # while it < 10000:
