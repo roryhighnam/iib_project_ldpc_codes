@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdbool.h>
+#include <string.h>
 
 void changeValues (int *a, int *b) {
     int temp = *a;
@@ -25,30 +26,16 @@ int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check
 
     int k = n*(dc-dv)/dc;
 
-    // Create random socket connections, and create variable_lookup and check_lookup
-    // int* variable_lookup = (int*) malloc(n*dv*sizeof(int));
-    // int* check_lookup = (int*) malloc(n*dv*sizeof(int));
-
+    // Create check_lookup as array of 1,2,...,n*dv
     for(int i=0; i<n*dv; i++) {
         check_lookup[i] = i;
     }
+    // Shuffle order of list to create random permutation
     shuffle(check_lookup, n*dv);
-    for(int i=0; i<n*dv; i++) {
-        variable_lookup[i] = check_lookup[i] / dc;
-    }
+    // Floor divide by dv to get 
     for(int i=0; i<n*dv; i++) {
         check_lookup[i] /= dv;
     }
-    // printf("Variable lookup:\n");
-    // for(int i=0; i<n*dv; i++) {
-    //     printf("%d\n", variable_lookup[i]);
-    // }
-    // printf("Check lookup:\n");
-    // for(int i=0; i<n*dv; i++) {
-    //     printf("%d\n", check_lookup[i]);
-    // }
-
-    
 
     // Check that no one check node is connected to the same variable node more than once
     for(int i=0; i<n-k; i++) {
@@ -60,23 +47,34 @@ int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check
             }
         }
     }
-    // Check that no one check node is connected to the same variable node more than once
-    // for(int i=0; i<n; i++) {
-    //     for(int j=0; j<dv; j++) {
-    //         for(int l=0; l<dv; l++) {
-    //             if (variable_lookup[i*dv+j] == variable_lookup[i*dv+l] && j!=l) {
-    //                 // printf("Duplicate");
-    //                 return generate_random_code(n,dv,dc,variable_lookup,check_lookup,parity_check,iterations+1);
-    //             }
-    //         }
-    //     }
-    // }
+
+    int indexes[n];
+    memset(indexes, 0, n*sizeof(int));
 
     for(int i=0; i<n-k; i++) {
         for(int j=0; j<dc; j++) {
             parity_check[i*n+check_lookup[i*dc+j]] = 1; 
         }
+        for(int j=0; j<n; j++) {
+            if(parity_check[i*n+j] == 1) {
+                variable_lookup[j*dv+indexes[j]] = i;
+
+                indexes[j] += 1;
+            }
+        }
     }
+    
+
+    // for(int i=0; i<n-k; i++) {
+    //     for(int j=0; j<n; j++) {
+    //         // column index = j
+    //         // row index = i
+    //         if(parity_check[i*n+j] == 1) {
+    //             variable_lookup[j*dv+indexes[j]] = i;
+    //             indexes[j] += 1;
+    //         }
+    //     }
+    // }
     return 1;
 }
 

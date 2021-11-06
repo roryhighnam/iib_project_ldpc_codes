@@ -10,11 +10,12 @@ import multiprocessing
 import ctypes as ct
 import os
 import sys
+from datetime import datetime
 
 base_directory = '/home/rory/Documents/iib_project_ldpc_codes/'
 
 def write_file(filename, errors, message_passing_block_error, message_passing_bit_error, optimal_block_error=None, optimal_bit_error=None):
-    with open('./simulation_data/'+filename, 'w', newline='') as csvfile:
+    with open(base_directory + 'simulation_data/'+filename, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         for error_at_iteration in errors:
             writer.writerow([error_at_iteration])
@@ -123,15 +124,18 @@ class regular_LDPC_code():
     def message_pass_decode(self, binary_sequence, max_its, check_lookup, variable_lookup):
         # Generate lookup tables for connected variable and check nodes ie dictionary 
         # with each check as key and connected variables list as value
+
         # check_lookup = []
         # for row in self.parity_check:
         #     check_list = list(np.nonzero(row==1)[0])
         #     check_lookup.append(check_list)
-
+        # print(variable_lookup)
         # variable_lookup = []
         # for col in self.parity_check.T:
         #     var_list = list(np.nonzero(col==1)[0])
         #     variable_lookup.append(var_list)
+
+        # print(variable_lookup)
         
         # Prepare variables for passing to C library
         check_lookup = np.array(check_lookup, dtype='int32').flatten()
@@ -186,7 +190,7 @@ def run_simulation(parameter_set):
     c_random_code = ct.CDLL(base_directory + 'random_code_generator.so')
 
     while i<num_tests and message_passing_block_errors<200:
-        
+
 
         check_lookup = np.zeros(n*dv, dtype='int32')
         variable_lookup = np.zeros(n*dv, dtype='int32')
@@ -243,7 +247,10 @@ def run_simulation(parameter_set):
     filename += '_dc=' + str(LDPC.dc)
     filename += '_it=' + str(iterations)
     filename += '_num=' + str(num_tests)
+    filename += '_time=' + datetime.now().strftime('%d-%m-%Y-%H-%M-%S')
     filename += '.csv'
+
+    print("Printing to file")
 
     if optimal:
         write_file(filename, average_errors, message_passing_block_errors/num_tests, message_passing_bit_errors/(num_tests*LDPC.n), optimal_decoding_block_errors/num_tests, optimal_decoding_bit_errors/(num_tests*LDPC.n))
@@ -332,6 +339,7 @@ def run_simulation_fixed_ldpc(parameter_set):
     filename += '_dc=' + str(LDPC.dc)
     filename += '_it=' + str(iterations)
     filename += '_num=' + str(i)
+    filename += '_time=' + datetime.now().strftime('%d-%m-%Y-%H-%M-%S')
     filename += '.csv'
 
     if optimal:
