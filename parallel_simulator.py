@@ -186,6 +186,7 @@ def run_simulation(parameter_set):
     c_random_code = ct.CDLL(base_directory + 'random_code_generator.so')
 
     while i<num_tests and message_passing_block_errors<200:
+        
 
         check_lookup = np.zeros(n*dv, dtype='int32')
         variable_lookup = np.zeros(n*dv, dtype='int32')
