@@ -11,8 +11,9 @@ import ctypes as ct
 import os
 import sys
 from datetime import datetime
+import galois
 
-base_directory = '/home/rory/Documents/iib_project_ldpc_codes/'
+base_directory = '/Users/rory/Documents/iib_project_ldpc_codes/'
 
 def write_file(filename, errors, message_passing_block_error, message_passing_bit_error, optimal_block_error=None, optimal_bit_error=None):
     with open(base_directory + 'simulation_data/'+filename, 'w', newline='') as csvfile:
@@ -43,43 +44,37 @@ class regular_LDPC_code():
         return np.mod(np.dot(self.generator_matrix, binary_sequence),2)
 
     def optimal_decode(self, binary_sequence):
+        print("Running optimal decode")
         '''Use Gaussian Elimination and back subsitution to solve for the erased bits,
         given the values of parity check equations for the non-erased bits. If solution cannot
         be found, returns input sequence.'''
-        # remaining_parity_checks will contain the columns of the parity check matrix where there are erasures
-        remaining_parity_checks = []
-        # Conversely, known_parity_checks will contain the columns of the parity check matrix where there are not erasures
-        known_parity_checks = []
-        # known_codeword contains the received bits that are not erasures
-        known_codeword = []
 
-        # Iterate through the input sequence and add corresponding data to variables above
-        for index,bit in enumerate(binary_sequence):
-            if bit != 0:
-                # If bit is not erasure, add column of parity check matrix to known_parity_checks for corresponding column. Also add the bit value to known_codeword.
-                known_parity_checks += [self.parity_check[:,index]]
-                if bit == -1:
-                    known_codeword = np.append(known_codeword, 0)
-                else:
-                    known_codeword = np.append(known_codeword, bit)
-            else:
-                # If bit is erasure, add the corresponding column to remaining_parity_check
-                remaining_parity_checks += [self.parity_check[:,index]]
+        # First check for trivial case of no erasures or more erasures than we have rows in the parity check
+        no_erasures = np.count_nonzero(binary_sequence==2)
+        if no_erasures==0 or no_erasures>(self.n-self.k):
+            print("Either no erasures, or too many to be able to solve")
+            return binary_sequence
 
-        known_parity_checks = np.array(known_parity_checks).T
-        remaining_parity_checks = np.array(remaining_parity_checks).T
-        known_codeword = np.array(known_codeword)
-        # target is the values of the parity check equations for the known bits (i.e. non-erasures)
-        target = np.mod(np.dot(known_parity_checks, known_codeword),2)
+        binary_sequence = np.array(binary_sequence, dtype='int32')
+        target = np.zeros(self.n-self.k, dtype='bool')
+        remaining_parity_checks = np.zeros(no_erasures*(self.n-self.k), dtype='bool')
+        binary_sequence_p = binary_sequence.ctypes.data_as(ct.POINTER(ct.c_int))
+        parity_check_p = self.parity_check.ctypes.data_as(ct.POINTER(ct.c_bool))
+        remaining_parity_checks_p = remaining_parity_checks.ctypes.data_as(ct.POINTER(ct.c_bool))
+        target_p = target.ctypes.data_as(ct.POINTER(ct.c_bool))
+        n_p = ct.c_int(self.n)
+        dv_p = ct.c_int(self.dv)
+        dc_p = ct.c_int(self.dc)
 
-        # Deal with underdetermined matrix or if there are no erasures
-        if remaining_parity_checks.shape[0] < binary_sequence.count(0):
-            # Should we return corrected bits if we can solve for some bits?
-            decoded_values = list(map(lambda x:'?' if x==0 else x, binary_sequence))
-            return list(map(lambda x: 0 if x==-1 else x, decoded_values))
-        # Deal with no erasures case
-        if len(known_codeword) == self.n:
-            return list(map(lambda x: 0 if x==-1 else x, binary_sequence))
+        c_ml_decoder = ct.CDLL(base_directory + 'ml_decoder.so')
+        c_ml_decoder.ml_decode(binary_sequence_p, target_p, parity_check_p, remaining_parity_checks_p, n_p, dv_p, dc_p)
+        target = np.array(target, dtype='int')
+        remaining_parity_checks = np.array(remaining_parity_checks, dtype='int')
+        remaining_parity_checks = np.reshape(remaining_parity_checks, (self.n-self.k, no_erasures))
+
+        GF = galois.GF(2)
+        overall_matrix = GF(np.insert(remaining_parity_checks, 1, target, axis=1))
+        print(overall_matrix.row_reduce())
         
         # Perform gaussian elimination to recover decoded codeword
         # Check all diagonals have a 1, otherwise remove this column -> this bit cannot be determined
@@ -230,7 +225,7 @@ def run_simulation(parameter_set):
             if '?' in optimal_decoded_codeword or -1 in optimal_decoded_codeword:
                 optimal_decoding_block_errors += 1
 
-            optimal_decoding_bit_errors += optimal_decoded_codeword.count('?')
+            optimal_decoding_bit_errors += np.count_nonzero(optimal_decoded_codeword==2)
         message_passing_bit_errors += errors[-1]
 
         i += 1
@@ -361,5 +356,5 @@ dc = int(sys.argv[6])
 # dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False, 'filenumber':filenumber}
 # run_simulation_fixed_ldpc(dictionary)
 
-dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False}
+dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':True}
 run_simulation(dictionary)
