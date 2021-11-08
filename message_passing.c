@@ -13,6 +13,7 @@ int message_passing(int *Mvc, int iterations, int *variable_to_check_list, int *
     int check_node;
 
     for (it=0; it<iterations; it++) {
+        // printf("%d\n", it);
 
         // Update check->variable messages
         // For each check node

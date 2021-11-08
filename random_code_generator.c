@@ -18,7 +18,11 @@ void shuffle(int *arr, int n) {
     }
 }
 
-int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check_lookup, bool *parity_check, int iterations) {
+int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check_lookup, bool *parity_check, int iterations, bool first_run) {
+    if(first_run) {
+        srand(time(0));
+        first_run = false;
+    }
 
     if (iterations > 1000000) {
         return 0;
@@ -42,17 +46,19 @@ int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check
         for(int j=0; j<dc; j++) {
             for(int l=0; l<dc; l++) {
                 if (check_lookup[i*dc+j] == check_lookup[i*dc+l] && j!=l) {
-                    return generate_random_code(n,dv,dc,variable_lookup,check_lookup,parity_check,iterations+1);
+                    return generate_random_code(n,dv,dc,variable_lookup,check_lookup,parity_check,iterations+1, false);
                 }
             }
         }
     }
 
-    int indexes[n];
-    memset(indexes, 0, n*sizeof(int));
+    int* indexes = (int*) malloc(n*sizeof(int));
 
-    for(int i=0; i<n-k; i++) {
-        for(int j=0; j<dc; j++) {
+    memset(indexes, 0, n*sizeof(int));
+    long long value = 0;
+    for(long long i=0; i<n-k; i++) {
+        for(long long j=0; j<dc; j++) {
+            value += 1;
             parity_check[i*n+check_lookup[i*dc+j]] = 1; 
         }
         for(int j=0; j<n; j++) {
@@ -64,38 +70,38 @@ int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check
         }
     }
     
-
-    // for(int i=0; i<n-k; i++) {
-    //     for(int j=0; j<n; j++) {
-    //         // column index = j
-    //         // row index = i
-    //         if(parity_check[i*n+j] == 1) {
-    //             variable_lookup[j*dv+indexes[j]] = i;
-    //             indexes[j] += 1;
-    //         }
-    //     }
-    // }
     return 1;
 }
 
 // int main() {
-//     printf("Starting test run\n");
-//     // int variable_lookup[3*10000];
-//     // int check_lookup[3*10000];
-//     int* check_lookup = (int*) malloc(10000*3*sizeof(int));
-//     int* variable_lookup = (int*) malloc(10000*3*sizeof(int));
-//     int* parity_check = (int*) malloc(10000*5000*sizeof(int));
-//     for (int i=0; i<1000; i++) {
-//         for(int j=0; j<10000; j++) {
-//             for(int l=0; l<5000; l++) {
-//                 parity_check[j*5000+l] = 0;
-//             }
-//         }
-//         generate_random_code(10000,3,6,variable_lookup, check_lookup, parity_check, 0);
-//         printf("i:%d\n",i); 
+//     printf("Running main");
+//     srand(time(0));
+// }
+
+// int main() {
+//     printf("Starting test run new\n");
+//     long long n = 100;
+//     long long k = 50;
+//     int* check_lookup = (int*) malloc(n*3*sizeof(int));
+//     int* variable_lookup = (int*) malloc(n*3*sizeof(int));
+//     printf("Assigning parity_check\n");
+//     bool* parity_check = (bool*) malloc(n*k*sizeof(bool));
+//     if(parity_check) {
+//         printf("Assigned\n");
 //     }
-//     printf("Ending test run\n");
+//     else{
+//         printf("Error in allocation\n");
+//     }
+//     for(long long j=0; j<n; j++) {
+//         for(long long l=0; l<k; l++) {
+//             parity_check[j*k+l] = 0;
+//         }
+//     }
+//     generate_random_code(n,3,6,variable_lookup, check_lookup, parity_check, 0, true);
+//     printf("Done");
+
 //     free(check_lookup);
 //     free(variable_lookup);
 //     free(parity_check);
+//     return 0;
 // }

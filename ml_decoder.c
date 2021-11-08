@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include <string.h>
 
-void gauss_jordan_elimination(int *remaining_parity_checks, int no_erasures, int *target) {
-
-}
+// void gauss_jordan_elimination(int *remaining_parity_checks, int no_erasures, int *target) {
+//     for(int i=0; i<)
+// }
 
 void ml_decode(int *channel_output, bool *target, bool *parity_check, bool *remaining_parity_checks, int n, int dv, int dc) {
     int k = n*(dc-dv)/dc;
@@ -26,7 +26,7 @@ void ml_decode(int *channel_output, bool *target, bool *parity_check, bool *rema
             }
         }
     }
-    printf("No of erasures: %d\n", unknown_bit_index/(n-k));
+    // printf("No of erasures: %d\n", unknown_bit_index/(n-k));
 
     // printf("\n");
     // for(int i=0; i<3; i++) {
