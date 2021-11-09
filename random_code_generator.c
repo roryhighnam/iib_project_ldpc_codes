@@ -18,16 +18,14 @@ void shuffle(int *arr, int n) {
     }
 }
 
-int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check_lookup, bool *parity_check, int iterations, bool first_run) {
-    if(first_run) {
-        srand(time(0));
+int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check_lookup, bool *parity_check, int iterations, bool first_run, int seed) {
+    if(first_run == true) {
+        srand(seed);
         first_run = false;
     }
-
     if (iterations > 1000000) {
         return 0;
     }
-
     int k = n*(dc-dv)/dc;
 
     // Create check_lookup as array of 1,2,...,n*dv
@@ -41,24 +39,24 @@ int generate_random_code(int n, int dv, int dc, int *variable_lookup, int *check
         check_lookup[i] /= dv;
     }
 
-    // Check that no one check node is connected to the same variable node more than once
-    for(int i=0; i<n-k; i++) {
-        for(int j=0; j<dc; j++) {
+    // Check that no one check node is connected to the same variable node more than once, use same loop to start building parity_check matrix
+    for(long long i=0; i<n-k; i++) {
+        for(long long j=0; j<dc; j++) {
             for(int l=0; l<dc; l++) {
-                if (check_lookup[i*dc+j] == check_lookup[i*dc+l] && j!=l) {
-                    return generate_random_code(n,dv,dc,variable_lookup,check_lookup,parity_check,iterations+1, false);
+                if (j!=l && check_lookup[i*dc+j] == check_lookup[i*dc+l]) {
+                    return generate_random_code(n,dv,dc,variable_lookup,check_lookup,parity_check,iterations+1, false, seed);
                 }
             }
+
         }
     }
 
     int* indexes = (int*) malloc(n*sizeof(int));
 
     memset(indexes, 0, n*sizeof(int));
-    long long value = 0;
+
     for(long long i=0; i<n-k; i++) {
         for(long long j=0; j<dc; j++) {
-            value += 1;
             parity_check[i*n+check_lookup[i*dc+j]] = 1; 
         }
         for(int j=0; j<n; j++) {

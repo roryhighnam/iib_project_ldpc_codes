@@ -42,13 +42,13 @@ def write_combined_file(filename, errors, message_passing_block_error, message_p
 
 class regular_LDPC_code():
 
-    def __init__(self,parity_check):
+    def __init__(self,parity_check, n, k, dv, dc):
         # self.generator_matrix = coding_matrix(np.array(parity_check, dtype='int'))
         self.parity_check = parity_check
-        self.n = len(parity_check[0])
-        self.k =  len(parity_check[0]) - len(parity_check)
-        self.dv = np.sum(parity_check, axis=0)[0]
-        self.dc = np.sum(parity_check, axis=1)[0]
+        self.n = n
+        self.k =  k
+        self.dv = dv
+        self.dc = dc
         self.rate = self.k / self.n
 
     def encode(self,binary_sequence):
@@ -155,6 +155,7 @@ def run_simulation(parameter_set):
     dc = parameter_set['dc']
     optimal = parameter_set['optimal']
     message_passing = parameter_set['message_passing']
+    seed = parameter_set['seed']
     k = int(n*(dc-dv)/dc)
     start_time = datetime.now()
 
@@ -187,21 +188,22 @@ def run_simulation(parameter_set):
         n_p = ct.c_int(n)
         dv_p = ct.c_int(dv)
         dc_p = ct.c_int(dc)
+        first_run = i==0
+        first_run_p = ct.c_bool(first_run)
+        seed_p = ct.c_int(seed)
 
-        success = c_random_code.generate_random_code(n_p, dv_p, dc_p, variable_lookup_p, check_lookup_p, parity_check_p, it_p)
+        success = c_random_code.generate_random_code(n_p, dv_p, dc_p, variable_lookup_p, check_lookup_p, parity_check_p, it_p, first_run_p, seed_p)
         parity_check = np.reshape(parity_check, (n-k,n))
-
         # if i%1000==0:
         print(i)
 
         # Create LDPC code and transmit over channel
-        LDPC = regular_LDPC_code(parity_check)
+        LDPC = regular_LDPC_code(parity_check, n, k, dv, dc)
         codeword = np.zeros(LDPC.n)
         channel_output = sim_BEC.new_transmit(codeword)
 
         if message_passing:
             decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations, check_lookup, variable_lookup)
-
             message_passing_error_counts += errors
             if errors[-1] != 0:
                 message_passing_block_errors += 1
@@ -390,15 +392,18 @@ mode = int(sys.argv[7])
 
 if mode == 0:
     # Only message passing for random codes
-    dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False, 'message_passing': True}
+    seed = int(sys.argv[8])
+    dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False, 'message_passing': True, 'seed':seed}
     run_simulation(dictionary)
 elif mode == 1:
     # Only ML decoder for random codes
-    dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':True, 'message_passing': False}
+    seed = int(sys.argv[8])
+    dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':True, 'message_passing': False, 'seed':seed}
     run_simulation(dictionary)
 elif mode == 2:
     # Both ML decoder and message passing for random codes
-    dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':True, 'message_passing': True}
+    seed = int(sys.argv[8])
+    dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':True, 'message_passing': True, 'seed':seed}
     run_simulation(dictionary)
 elif mode == 3:
     # Only message passing for fixed code
