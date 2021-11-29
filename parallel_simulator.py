@@ -13,6 +13,7 @@ import os
 import sys
 from datetime import datetime
 import galois
+import scipy.io
 
 base_directory = '/home/rory/Documents/iib_project_ldpc_codes/'
 
@@ -85,26 +86,45 @@ class regular_LDPC_code():
 
         remaining_parity_checks = np.array(remaining_parity_checks, dtype='int')
         remaining_parity_checks = np.reshape(remaining_parity_checks, (no_erasures, self.n-self.k)).T
-
         GF = galois.GF(2)
-        remaining_parity_checks = GF(np.c_[remaining_parity_checks, target])
-        remaining_parity_checks = remaining_parity_checks.row_reduce(no_erasures)
-        
-        # print(remaining_parity_checks)
-        # print(remaining_parity_checks[:,:-1].diagonal())
+        remaining_parity_checks_reduced = GF(np.c_[remaining_parity_checks, target])
+        remaining_parity_checks_reduced = remaining_parity_checks_reduced.row_reduce(no_erasures)
+        unsolvable_unknown_indexes = []
+        erasure_positions = np.nonzero(binary_sequence==2)[0]
+        i = 0
+        # Check if reduced partity check matrix has variables we cannot solve
+        while np.count_nonzero(remaining_parity_checks_reduced[:no_erasures,:-1].diagonal()==1) != (no_erasures-len(unsolvable_unknown_indexes)) and i<1000:
+            # Get index in reduced parity check matrix of first unsolvable bit
+            first_unknown_index = np.nonzero(remaining_parity_checks_reduced[:,:-1].diagonal()!=1)[0][0]
+            # Convert this into the index in the overall codeword
+            first_unknown_bit = erasure_positions[first_unknown_index]
+            erasure_positions = np.delete(erasure_positions, first_unknown_index)
+            # Add to list of unsolvables
+            unsolvable_unknown_indexes.append(first_unknown_bit)
+            # Get indexes of check nodes to remove
+            checks_to_remove = np.nonzero(remaining_parity_checks[:,first_unknown_index])[0]
+            remaining_parity_checks = np.delete(remaining_parity_checks, checks_to_remove, axis=0)
+            remaining_parity_checks = np.delete(remaining_parity_checks, first_unknown_index, axis=1)
+            target = np.delete(target, checks_to_remove)
+            remaining_parity_checks_reduced = GF(np.c_[remaining_parity_checks, target]).row_reduce(no_erasures-len(unsolvable_unknown_indexes))
+            i += 1
+            # print("Unsolvables: ", unsolvable_unknown_indexes)
 
-        if np.count_nonzero(remaining_parity_checks[:,:-1].diagonal()==1) == no_erasures:
-            solved_unknowns = np.array(remaining_parity_checks[:no_erasures,-1])
-        else:
-            return binary_sequence
+        solved_unknowns = np.array(remaining_parity_checks_reduced[:no_erasures-len(unsolvable_unknown_indexes),-1])
         
         decoded_codeword = []
-        for bit in binary_sequence:
+        for index,bit in enumerate(binary_sequence):
             if bit == 2:
-                decoded_codeword.append(solved_unknowns[0])
-                solved_unknowns = np.delete(solved_unknowns, 0)
+                if index not in unsolvable_unknown_indexes:
+                    decoded_codeword.append(solved_unknowns[0])
+                    solved_unknowns = np.delete(solved_unknowns, 0)
+                else:
+                    # print(index)
+                    decoded_codeword.append(2)
             else:
                 decoded_codeword.append(bit)
+            if bit == 0 and decoded_codeword[index]==2:
+                print(index, bit, decoded_codeword[index])
 
         return np.array(decoded_codeword)
 
@@ -270,25 +290,26 @@ def run_simulation_fixed_ldpc(parameter_set):
     code_filename = 'code_no_'+str(filenumber)+'_n_'+str(n)+'_dv_'+str(dv)+'_dc_'+str(dc)+'.npy'
     check_filename = 'check_code_no_'+str(filenumber)+'_n_'+str(n)+'_dv_'+str(dv)+'_dc_'+str(dc)+'.npy'
     variable_filename = 'variable_code_no_'+str(filenumber)+'_n_'+str(n)+'_dv_'+str(dv)+'_dc_'+str(dc)+'.npy'
-    existing_code_file = False  
+    files_found = 0
     for filename in os.listdir(base_directory+'parity_checks/'):
         if filename == code_filename:
-            existing_code_file = True
             print('Found existing code')
+            files_found += 1
             with open(base_directory+'parity_checks/' + code_filename, 'rb') as f:
                 parity_check = np.load(f)
         if filename == check_filename:
+            files_found += 1
             print('Found existing check lookup')
             with open(base_directory+'parity_checks/' + check_filename, 'rb') as f:
                 check_lookup = np.load(f)
-                print(check_lookup)
         if filename == variable_filename:
-            print('Found existing check lookup')
+            files_found += 1
+            print('Found existing variable lookup')
             with open(base_directory+'parity_checks/' + variable_filename, 'rb') as f:
                 variable_lookup = np.load(f)
 
     # If no file found, generate new parity check and save it
-    if not existing_code_file:
+    if files_found != 3:
         it = 0
         c_random_code = ct.CDLL(base_directory + 'random_code_generator.so')
 
@@ -313,7 +334,7 @@ def run_simulation_fixed_ldpc(parameter_set):
         with open(base_directory+'parity_checks/' + variable_filename, 'wb') as f:
             np.save(f, variable_lookup)
 
-    LDPC = regular_LDPC_code(parity_check)
+    LDPC = regular_LDPC_code(parity_check, n, k, dv, dc)
     codeword = np.zeros(LDPC.n)
 
     if message_passing:
