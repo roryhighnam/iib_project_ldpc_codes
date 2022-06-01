@@ -1,8 +1,11 @@
 import os
 import numpy as np
 import csv
-data_directory = '/home/rory/Documents/iib_project_ldpc_codes/hpc_simulation_data_fixed/'
-return_combined_directory = '/home/rory/Documents/iib_project_ldpc_codes/hpc_simulation_data_fixed_mp_512/50_it/'
+# data_directory = '/home/rory/Documents/iib_project_ldpc_codes/hpc_simulation_data_fixed/'
+# return_combined_directory = '/home/rory/Documents/iib_project_ldpc_codes/hpc_simulation_data_fixed_mp_512/50_it/'
+
+data_directory = '/Users/Rory/Documents/iib_project_ldpc_codes_new/iib_project_ldpc_codes/simulation_data_random_ensemble_report/'
+return_combined_directory = '/Users/Rory/Documents/iib_project_ldpc_codes_new/iib_project_ldpc_codes/random_ensemble_report_combined/'
 
 # if data_directory == return_combined_directory:
 #     raise ValueError('Return directory must be different!')
@@ -20,6 +23,7 @@ def get_parameters(filename):
             simulation_parameters_dict[simulation_parameter.split('=')[0]] = simulation_parameter.split('=')[1]
         elif '.csv' in simulation_parameter:
             simulation_parameters_dict[simulation_parameter.split('=')[0]] = simulation_parameter.split('=')[1].split('.')[0]
+    print(simulation_parameters_dict)
     return simulation_parameters_dict
 
 
@@ -59,12 +63,13 @@ def concentration_combine(BECs):
 
 def ensemble_combine(BECs):
     for BEC in BECs:
-        errors = np.zeros(201, dtype='int')
+        errors = np.zeros(202, dtype='int')
         file_count = 0
         num_count = 0
         for filename in os.listdir(data_directory):
             parameters = get_parameters(filename)
-            if float(parameters['BEC']) == BEC:
+            print(parameters)
+            if 'BEC' in parameters and 'id' in parameters and float(parameters['BEC']) == BEC:
                 print(filename)
                 specific_error = []
                 file_count += 1
@@ -188,4 +193,4 @@ def optimal_and_message_passing_concentration_combine(BECs):
 # ensemble_combine([0.42])
 # optimal_concentration_combine([0.36, 0.38, 0.4, 0.42, 0.44, 0.46, 0.48, 0.5])
 # optimal_and_message_passing_concentration_combine([0.3, 0.32, 0.34, 0.36, 0.38, 0.4, 0.42, 0.44, 0.46, 0.48, 0.5])
-mp_concentration_combine([0.3, 0.32, 0.34, 0.36, 0.38, 0.4, 0.42, 0.44, 0.46, 0.48, 0.5], 50)
+ensemble_combine([0.4])

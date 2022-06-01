@@ -13,6 +13,10 @@ int message_passing(int *Mvc, int iterations, int *variable_to_check_list, int *
     int check_node;
 
     for (it=0; it<iterations; it++) {
+        if (it > 1 && errors[it-1]==errors[it-2]) {
+            errors[it] = errors[it-1];
+            continue;
+        }
         // printf("%d\n", it);
 
         // Update check->variable messages

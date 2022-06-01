@@ -2,10 +2,13 @@ import matplotlib.pyplot as plt
 import os
 import csv
 import numpy as np
-from density_evolution import density_evolution
+from sympy import sec
+from density_evolution import modified_density_evolution
 
-base_dir = './simulation_data_random_ensemble'
-plot_base_dir = './hpc_simulation_ensemble_plots/'
+base_dir = './random_ensemble_report_combined'
+plot_base_dir = './random_ensemble_report_plots/'
+
+colours = ['red', 'green', 'blue', 'orange']
 
 def get_parameters(filename):
     # Get simulation parameters from filename
@@ -21,6 +24,7 @@ def get_parameters(filename):
     return simulation_parameters_dict
 
 def plot_error_vs_iteration_number(erasure_prob, ns, figure, save_as_filename):
+    colour_index = 0
     min_error = erasure_prob
     # Plot simulations with certain erausre_prob for various values of n
     plt.figure(figure)
@@ -40,7 +44,33 @@ def plot_error_vs_iteration_number(erasure_prob, ns, figure, save_as_filename):
                             min_error = float(row[0])
             errors = [float(error) for error in errors]
 
-            plt.plot(errors, label=simulation_parameters_dict['n'])
+            plt.plot(errors, label=simulation_parameters_dict['n'], color= colours[colour_index%len(colours)])
+            # if simulation_parameters_dict['n'] == '100':
+            #     if erasure_prob == 0.3:
+            #         plt.hlines(0.00927103257501793, 0, 201, linestyles='dashed', colors=colours[colour_index%len(colours)], label='Finite length analysis n=100')
+            #         plt.hlines(0.0007533780499659765, 0, 201, linestyles='dotted', colors=colours[colour_index%len(colours)], label='ML decoder n=100')
+            #     if erasure_prob == 0.35:
+            #         plt.hlines(0.0059553, 0, 201, linestyles='dotted', colors=colours[colour_index%len(colours)], label='ML decoder n=100')
+            #         plt.hlines(0.0469878894379349, 0, 201, linestyles='dashed', colors=colours[colour_index%len(colours)], label='Finite length analysis n=100')
+            #     if erasure_prob == 0.4:
+            #         plt.hlines(0.145904820551055, 0, 201, linestyles='dashed', colors=colours[colour_index%len(colours)], label='Finite length analysis n=100')
+            #         plt.hlines(0.045414847161572056, 0, 201, linestyles='dotted', colors=colours[colour_index%len(colours)], label='ML decoder n=100')
+
+            # if simulation_parameters_dict['n'] == '1000':
+            #     if erasure_prob == 0.3:
+            #         plt.hlines(7.36669556389754e-6, 0, 201, linestyles='dashed', colors=colours[colour_index%len(colours)], label='Finite length analysis n=1000')
+            #         # plt.hlines(1.28779716565522e-6, 0, 201, linestyles='dashed', colors=colours[colour_index%len(colours)], label='Finite length analysis n=1000')
+            #         # ML decoder value needs changing
+            #         plt.hlines(2.7454103745054328e-06, 0, 201, linestyles='dotted', colors=colours[colour_index%len(colours)], label='ML decoder n=1000')
+            #     if erasure_prob == 0.35:
+            #         plt.hlines(1.30239574884079e-5, 0, 201, linestyles='dashed', colors=colours[colour_index%len(colours)], label='Finite length analysis n=1000')
+            #         plt.hlines(3.5772410602232966e-06, 0, 201, linestyles='dotted', colors=colours[colour_index%len(colours)], label='ML decoder n=1000')
+            #     if erasure_prob == 0.4:
+            #         plt.hlines(0.0214084026498356, 0, 201, linestyles='dashed', colors=colours[colour_index%len(colours)], label='Finite length analysis n=1000')
+            #         # ML decoder updated but seems incorrect?
+            #         plt.hlines(5.020577124995474e-06, 0, 201, linestyles='dotted', colors=colours[colour_index%len(colours)], label='ML decoder n=1000')
+
+            colour_index += 1
             plt.yscale('log')
             plt.suptitle('Regular LDPC code simulation', fontsize='18')
             subtitle_text = ''
@@ -53,24 +83,33 @@ def plot_error_vs_iteration_number(erasure_prob, ns, figure, save_as_filename):
             plt.title(subtitle_text)
     plt.xlabel('Iterations')
     plt.ylabel('Log BER')
-    plt.plot(density_evolution(erasure_prob, int(simulation_parameters_dict['it']), int(simulation_parameters_dict['dv']), int(simulation_parameters_dict['dc']), min_error), '--', label='Density evolution')
-
-
+    plt.plot(modified_density_evolution(erasure_prob, int(simulation_parameters_dict['it']), int(simulation_parameters_dict['dv']), int(simulation_parameters_dict['dc']), min_error), '--', label='Density evolution')
+    
     # Sort legend labels by ascending order
     handles, labels = plt.gca().get_legend_handles_labels()
-    i = labels.index('Density evolution')
-    density_handle = handles[i]
-    density_label = labels[i]
-    handles.pop(i)
-    labels.pop(i)
+    # text_titles = ['Density evolution', 'Finite length analysis n=100', 'Finite length analysis n=1000', 'ML decoder n=100',  'ML decoder n=1000']
+    text_titles = ['Density evolution']
+    text_labels = []
+    text_handles = []
+    text_indexes = []
+    for text_title in text_titles:
+        index = labels.index(text_title)
+        text_indexes.append(index)
+        text_labels.append(labels[index])
+        text_handles.append(handles[index])
+        handles.pop(index)
+        labels.pop(index)
     labels = [int(label) for label in labels]
     zipped = list(zip(handles, labels))
     zipped.sort(key=lambda tup: tup[1])
     handles, labels = [[i for i,j in zipped], [j for i,j in zipped]]
-    handles.append(density_handle)
-    labels.append(density_label)
-    plt.legend(handles, labels)
-
+    for i in range(len(labels)):
+        labels[i] = '$n$ = ' + str(labels[i])
+    for i in range(len(text_handles)):
+        handles.append(text_handles[i])
+        labels.append(text_labels[i])
+    plt.legend(handles, labels, loc=(1.04,0))
+    plt.grid('both')
     plt.savefig(plot_base_dir + save_as_filename, bbox_inches='tight')
 
 def plot_error_vs_n(erasure_prob, figure, save_as_filename):
@@ -313,15 +352,16 @@ figure = 1
 
 # plot_error_vs_erasure_prob_fixed_code_combined(512, figure, 'n=512_varying_erasure_prob.jpg')
 # figure += 1
-plot_error_vs_iteration_number(0.3, [100,1000,10000], figure, 'BEC=0.3_n=10000_vs_iteration_number.jpg')
+# plot_error_vs_iteration_number(0.3, [100,1000,10000], figure, 'BEC=0.3_n=10000_vs_iteration_number.jpg')
+# figure += 1
+plot_error_vs_iteration_number(0.42, [100000], figure, 'BEC=0.42_n=100000_vs_iteration_number_latest.jpg')
 figure += 1
-plot_error_vs_iteration_number(0.4, [100,1000,10000], figure, 'BEC=0.4_n=10000_vs_iteration_number.jpg')
-figure += 1
-plot_error_vs_iteration_number(0.42, [100,1000,10000], figure, 'BEC=0.42_n=10000_vs_iteration_number.jpg')
-figure += 1
-plot_error_vs_iteration_number(0.43, [100,1000,10000], figure, 'BEC=0.43_n=10000_vs_iteration_number.jpg')
-figure += 1
-plot_error_vs_iteration_number(0.5, [100,1000,10000], figure, 'BEC=0.5_n=10000_vs_iteration_number.jpg')
-figure += 1
+
+# plot_error_vs_iteration_number(0.42, [100,1000,10000], figure, 'BEC=0.42_n=10000_vs_iteration_number.jpg')
+# figure += 1
+# plot_error_vs_iteration_number(0.43, [100,1000,10000], figure, 'BEC=0.43_n=10000_vs_iteration_number.jpg')
+# figure += 1
+# plot_error_vs_iteration_number(0.5, [100,1000,10000], figure, 'BEC=0.5_n=10000_vs_iteration_number.jpg')
+# figure += 1
 # plot_error_vs_erasure_prob(200, figure, 'n=200_varying_erasure_prob.jpg')
 # figure += 1

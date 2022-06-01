@@ -163,6 +163,7 @@ class regular_LDPC_code():
 
         it = c_message_pass.message_passing(binary_sequence_p, max_its_p, variable_lookup_p, check_lookup_p, errors_p, n_p, k_p, dv_p, dc_p)
         errors = np.insert(errors, 0, initial_error_count)
+        # print(errors)
         return binary_sequence, errors
 
 def run_simulation(parameter_set):
@@ -176,6 +177,7 @@ def run_simulation(parameter_set):
     optimal = parameter_set['optimal']
     message_passing = parameter_set['message_passing']
     seed = parameter_set['seed']
+    expurgation = parameter_set['expurgation']
     k = int(n*(dc-dv)/dc)
     start_time = datetime.now()
 
@@ -195,13 +197,17 @@ def run_simulation(parameter_set):
 
     c_random_code = ct.CDLL(base_directory + 'random_code_generator.so')
 
-    while block_error<200 and i<num_tests and (datetime.now()-start_time).total_seconds() < 43000:
+    while block_error<200 and i<num_tests:
 
         # Prepare variables for C random code generator
+        sequence = np.arange(n*dv, dtype='int32')
+        # indexes = np.zeros(n, dtype='int32')
         check_lookup = np.zeros(n*dv, dtype='int32')
         variable_lookup = np.zeros(n*dv, dtype='int32')
         parity_check = np.zeros(n*(n-k), dtype='bool')
         check_lookup_p = check_lookup.ctypes.data_as(ct.POINTER(ct.c_int))
+        sequence_p = sequence.ctypes.data_as(ct.POINTER(ct.c_int))
+        # indexes_p = indexes.ctypes.data_as(ct.POINTER(ct.c_int))
         variable_lookup_p = variable_lookup.ctypes.data_as(ct.POINTER(ct.c_int))
         parity_check_p = parity_check.ctypes.data_as(ct.POINTER(ct.c_bool))
         it_p = ct.c_int(it)
@@ -211,8 +217,13 @@ def run_simulation(parameter_set):
         first_run = i==0
         first_run_p = ct.c_bool(first_run)
         seed_p = ct.c_int(seed)
-
-        success = c_random_code.generate_random_code(n_p, dv_p, dc_p, variable_lookup_p, check_lookup_p, parity_check_p, it_p, first_run_p, seed_p)
+        # print("Generating now", i)
+        success = 0
+        while success == 0:
+            success = c_random_code.generate_random_code(n_p, dv_p, dc_p, variable_lookup_p, check_lookup_p, sequence_p, parity_check_p, it_p, first_run_p, seed_p)
+        # print("success", success)
+        # print("Check lookup", check_lookup)
+        # print("sequence", sequence)
         parity_check = np.reshape(parity_check, (n-k,n))
         if i%100==0:
             print(i)
@@ -224,11 +235,12 @@ def run_simulation(parameter_set):
 
         if message_passing:
             decoded_codeword, errors = LDPC.message_pass_decode(channel_output, iterations, check_lookup, variable_lookup)
-            message_passing_error_counts += errors
-            if errors[-1] != 0:
-                message_passing_block_errors += 1
-            message_passing_bit_errors += errors[-1]
-            block_error = message_passing_block_errors
+            if errors[-1] > expurgation:
+                message_passing_error_counts += errors
+                if errors[-1] != 0:
+                    message_passing_block_errors += 1
+                message_passing_bit_errors += errors[-1]
+                block_error = message_passing_block_errors
 
         if optimal:
             optimal_decoded_codeword = LDPC.optimal_decode(channel_output)
@@ -247,7 +259,8 @@ def run_simulation(parameter_set):
 
     average_errors = message_passing_error_counts / (LDPC.n*num_tests)
 
-    filename = 'regular_code'
+    filename = 'regular_code_expurgated='
+    filename += str(expurgation)
     filename += '_BEC=' + str(sim_BEC.erasure_prob)
     filename += '_n=' + str(LDPC.n)
     filename += '_k=' + str(LDPC.k)
@@ -409,12 +422,13 @@ n = int(sys.argv[4])
 dv = int(sys.argv[5])
 dc = int(sys.argv[6])
 mode = int(sys.argv[7])
+expurgation = int(sys.argv[9])
 
 
 if mode == 0:
     # Only message passing for random codes
     seed = int(sys.argv[8])
-    dictionary = {'BEC': erasure_prob, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False, 'message_passing': True, 'seed':seed}
+    dictionary = {'BEC': erasure_prob, 'expurgation': expurgation, 'num_tests':num_tests, 'iterations':iterations, 'n':n, 'dv':dv, 'dc':dc, 'optimal':False, 'message_passing': True, 'seed':seed}
     run_simulation(dictionary)
 elif mode == 1:
     # Only ML decoder for random codes
